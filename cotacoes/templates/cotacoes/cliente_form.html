@@ -1,0 +1,46 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Novo Cliente | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">CRM</p>
+        <h1 class="mb-1">Novo Cliente</h1>
+        <p class="text-muted mb-0">Cadastro de perfil no CRM (sem cotação associada).</p>
+    </div>
+</section>
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card-app">
+                <form method="post" action="{% url 'novo_cliente' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nome Completo</label>
+                        <input type="text" name="nome" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">CPF</label>
+                        <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Data de Nascimento</label>
+                        <input type="date" name="data_nascimento" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">E-mail</label>
+                        <input type="email" name="email" class="form-control">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Telefone</label>
+                        <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11">
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom w-100 fw-bold">Cadastrar Cliente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

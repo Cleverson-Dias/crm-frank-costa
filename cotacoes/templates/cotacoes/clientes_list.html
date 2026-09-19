@@ -1,0 +1,53 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Clientes | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">CRM</p>
+        <h1 class="mb-1">Clientes</h1>
+        <p class="text-muted mb-0">Perfis cadastrados e seus respectivos bens segurados.</p>
+    </div>
+</section>
+
+<div class="container my-5">
+    <div class="card-app">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Clientes Ativos</h2>
+            <a href="{% url 'novo_cliente' %}" class="btn btn-primary-custom btn-sm">
+                <i class="bi-plus-lg"></i> Novo Cliente
+            </a>
+        </div>
+
+        {% if clientes %}
+        <div class="table-responsive">
+            <table class="table table-app align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>E-mail</th>
+                        <th>Telefone</th>
+                        <th>Bens Cadastrados</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in clientes %}
+                    <tr>
+                        <td>{{ cliente.nome }}</td>
+                        <td>{{ cliente.cpf }}</td>
+                        <td>{{ cliente.email|default:"—" }}</td>
+                        <td>{{ cliente.telefone|default:"—" }}</td>
+                        <td>{{ cliente.bens.count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Nenhum cliente cadastrado ainda.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

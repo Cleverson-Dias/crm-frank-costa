@@ -1,0 +1,78 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Nova Cotação | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">Simulação</p>
+        <h1 class="mb-1">Nova Cotação</h1>
+        <p class="text-muted mb-0">Preencha os dados do segurado e do bem para processar a triagem e o cálculo do prêmio.</p>
+    </div>
+</section>
+
+<div class="container my-5">
+    <div class="row g-4 justify-content-center">
+        <div class="col-lg-8">
+            <div class="card-app">
+                <form method="post" action="{% url 'nova_cotacao' %}">
+                    {% csrf_token %}
+
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-person"></i> 1. Dados do Segurado</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-7">
+                            <label class="form-label small fw-semibold">Nome do Cliente</label>
+                            <input type="text" name="nome" class="form-control" placeholder="Ex: Cleverson Alves" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold">CPF</label>
+                            <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Idade do Condutor Principal</label>
+                            <input type="number" name="idade" class="form-control" placeholder="Ex: 26" min="0" max="120" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">E-mail</label>
+                            <input type="email" name="email" class="form-control" placeholder="cliente@email.com">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11">
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-shield-check"></i> 2. Detalhes do Bem</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Tipo de Seguro</label>
+                            <select name="tipo_seguro" class="form-select">
+                                <option value="auto">Automóvel</option>
+                                <option value="residencial">Residencial</option>
+                                <option value="vida">Vida</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Valor do Bem (R$)</label>
+                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex: 85000" step="0.01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Uso do Veículo</label>
+                            <select name="uso_veiculo" class="form-select">
+                                <option value="passeio">Lazer / Passeio</option>
+                                <option value="trabalho">Trabalho / Uber</option>
+                                <option value="carga">Comercial / Carga</option>
+                            </select>
+                            <span class="form-text">Registrado para análises futuras — ainda não influencia o cálculo.</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary-custom w-100 py-2 fw-bold">
+                        <i class="bi-cpu"></i> Calcular e Processar com IA Simbólica
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

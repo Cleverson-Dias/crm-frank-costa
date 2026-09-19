@@ -1,0 +1,56 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Resultado da Cotação | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">Resultado</p>
+        <h1 class="mb-1">Cotação de {{ cliente.nome }}</h1>
+        <p class="text-muted mb-0">Processada pelo motor de cálculo e pela IA Simbólica.</p>
+    </div>
+</section>
+
+<div class="container my-5">
+    <div class="row g-4 justify-content-center">
+        <div class="col-lg-7">
+
+            <!-- Parecer da IA -->
+            <div class="card-app mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi-robot"></i> Parecer da IA Simbólica</h5>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="status-badge status-{{ parecer.status|slugify }}">{{ parecer.status }}</span>
+                    <span class="text-muted small">Regra {{ parecer.regra_id }}</span>
+                </div>
+                <p class="mb-0 text-muted small">{{ parecer.motivo }}</p>
+            </div>
+
+            <!-- Valores calculados -->
+            <div class="card-app">
+                <h6 class="fw-bold text-muted mb-3 small text-uppercase">Estimativa de Valores</h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted small">Prêmio Anual Estimado:</span>
+                    <span class="fw-bold fs-5">R$ {{ resultado_calculo.premio }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted small">Valor da Franquia:</span>
+                    <span class="fw-semibold">R$ {{ resultado_calculo.franquia }}</span>
+                </div>
+                <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                    <span class="text-muted small">Margem da Corretora:</span>
+                    <span class="fw-bold text-success">R$ {{ resultado_calculo.margem }}</span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 mt-4">
+                <a href="{% url 'nova_cotacao' %}" class="btn btn-outline-custom">Nova Simulação</a>
+                <a href="{% url 'dashboard' %}" class="btn btn-primary-custom">Ver no Dashboard</a>
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+                Cotação salva no MongoDB — ID: <code>{{ cotacao_id }}</code>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

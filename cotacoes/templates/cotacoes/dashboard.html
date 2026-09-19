@@ -1,0 +1,88 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Dashboard Gerencial | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">Painel gerencial</p>
+        <h1 class="mb-1">Indicadores da Carteira</h1>
+        <p class="text-muted mb-0">Visão consolidada de cotações, faturamento e carteira de clientes.</p>
+    </div>
+</section>
+
+<div class="container my-5">
+
+    <!-- Indicadores principais -->
+    <div class="row g-4 mb-5">
+        <div class="col-6 col-lg-3">
+            <div class="card-app indicator-card">
+                <span class="indicator-label">Cotações Registradas</span>
+                <span class="indicator-value">{{ total_cotacoes }}</span>
+                <span class="indicator-note">Total acumulado no sistema</span>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-app indicator-card">
+                <span class="indicator-label">Taxa de Aprovação</span>
+                <span class="indicator-value">{{ taxa_aprovacao }}%</span>
+                <span class="indicator-note">Pareceres "Aprovada" pela IA Simbólica</span>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-app indicator-card">
+                <span class="indicator-label">Margem Estimada</span>
+                <span class="indicator-value">R$ {{ faturamento_estimado }}</span>
+                <span class="indicator-note">Comissão acumulada sobre as cotações</span>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-app indicator-card">
+                <span class="indicator-label">Clientes Ativos</span>
+                <span class="indicator-value">{{ clientes_ativos }}</span>
+                <span class="indicator-note">Cadastros ativos no CRM</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cotações recentes -->
+    <div class="card-app">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Cotações Recentes</h2>
+            <a href="{% url 'nova_cotacao' %}" class="btn btn-outline-custom btn-sm">Nova Cotação</a>
+        </div>
+
+        {% if cotacoes_recentes %}
+        <div class="table-responsive">
+            <table class="table table-app align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Tipo</th>
+                        <th>Valor do Bem</th>
+                        <th>Parecer IA</th>
+                        <th class="text-end">Prêmio Estimado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cotacoes_recentes %}
+                    <tr>
+                        <td>{{ c.cliente_nome }}</td>
+                        <td class="text-capitalize">{{ c.tipo_seguro }}</td>
+                        <td>R$ {{ c.valor_bem }}</td>
+                        <td>
+                            <span class="status-badge status-{{ c.status_ia|slugify }}">{{ c.status_ia }}</span>
+                        </td>
+                        <td class="text-end">R$ {{ c.premio }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Nenhuma cotação registrada ainda. Assim que a primeira simulação for salva no MongoDB, ela aparece aqui.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

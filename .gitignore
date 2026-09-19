@@ -1,0 +1,19 @@
+# Ambiente virtual
+venv/
+env/
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Banco de dados local (cada um vai ter o seu)
+db.sqlite3
+
+# Configurações sensíveis (se vocês criarem um .env depois)
+.env
+
+# Arquivos do VS Code
+.vscode/
+
+# Migrations: NÃO ignorar — o time precisa da mesma estrutura de banco
+# (por isso não colocamos migrations/ aqui)
