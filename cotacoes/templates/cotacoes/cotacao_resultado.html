@@ -44,7 +44,10 @@
 
             <div class="d-flex gap-3 mt-4">
                 <a href="{% url 'nova_cotacao' %}" class="btn btn-outline-custom">Nova Simulação</a>
-                <a href="{% url 'dashboard' %}" class="btn btn-primary-custom">Ver no Dashboard</a>
+                {% if parecer.status != "Recusada" %}
+                    <a href="{% url 'fechar_negocio' cotacao_id=cotacao_id %}" class="btn btn-primary-custom">Fechar Negócio</a>
+                {% endif %}
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-custom">Ver no Dashboard</a>
             </div>
 
             <p class="text-muted small mt-3 mb-0">

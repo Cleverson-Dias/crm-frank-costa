@@ -21,6 +21,7 @@ Cada documento salvo tem esta forma-base (o resto varia por tipo):
 
 from datetime import datetime, timezone
 
+from bson import ObjectId
 from pymongo import MongoClient
 from django.conf import settings
 
@@ -61,3 +62,13 @@ def listar_todas_cotacoes(limite=100):
     """Usado pelo dashboard (RF06) para montar os indicadores agregados."""
     db = get_db()
     return list(db.cotacoes.find().sort("criado_em", -1).limit(limite))
+
+
+def buscar_cotacao_por_id(cotacao_id):
+    """
+    Busca uma simulação específica pelo ID do Mongo — usada no fluxo
+    de "Fechar Negócio", que transforma uma cotação aprovada numa
+    Apólice de verdade no Postgres.
+    """
+    db = get_db()
+    return db.cotacoes.find_one({"_id": ObjectId(cotacao_id)})
