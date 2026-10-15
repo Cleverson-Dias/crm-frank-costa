@@ -254,3 +254,40 @@ h1, h2, h3, h4, h5, .display-5 {
     font-size: 0.85rem;
     color: var(--texto-secundario);
 }
+
+
+
+/* ==========================================================================
+   Cards de acesso rápido (home)
+   ========================================================================== */
+.feature-card {
+    display: block;
+    background-color: var(--branco);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+    padding: 1.75rem;
+    text-decoration: none;
+    color: inherit;
+    height: 100%;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.feature-card:hover {
+    border-color: var(--verde-marca);
+    transform: translateY(-2px);
+    color: inherit;
+}
+
+.feature-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--verde-suave);
+    color: var(--verde-marca-escuro);
+    border-radius: 8px;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
