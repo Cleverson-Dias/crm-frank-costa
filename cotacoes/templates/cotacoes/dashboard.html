@@ -36,14 +36,14 @@
                 <span class="indicator-note">Negócios fechados de verdade</span>
             </div>
         </div>
-        <div class="col-6 col-lg-3">
-            <div class="card-app indicator-card">
-                <span class="indicator-value">R$ {{ comissao_realizada|floatformat:2 }}</span>
-                <span class="indicator-value">R$ {{ comissao_realizada }}</span>
-                <span class="indicator-note">Sobre apólices ativas</span>
+            <div class="col-6 col-lg-3">
+                <div class="card-app indicator-card">
+                    <span class="indicator-label">Comissão Realizada</span>
+                    <span class="indicator-value">R$ {{ comissao_realizada|floatformat:2 }}</span>
+                    <span class="indicator-note">Sobre apólices ativas</span>
+                </div>
             </div>
         </div>
-    </div>
 
     <!-- Cotações recentes -->
     <div class="card-app">
@@ -62,6 +62,7 @@
                         <th>Valor do Bem</th>
                         <th>Parecer IA</th>
                         <th class="text-end">Prêmio Estimado</th>
+                        <th class="text-end">Ação</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -74,6 +75,15 @@
                             <span class="status-badge status-{{ c.status_ia|slugify }}">{{ c.status_ia }}</span>
                         </td>
                         <td class="text-end">R$ {{ c.premio|floatformat:2 }}</td>
+                        <td class="text-end">
+                            {% if c.fechada %}
+                                <span class="status-badge status-aprovada">Fechada</span>
+                            {% elif c.status_ia != "Recusada" %}
+                                <a href="{% url 'fechar_negocio' cotacao_id=c.cotacao_id %}" class="btn btn-outline-custom btn-sm">Fechar Negócio</a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

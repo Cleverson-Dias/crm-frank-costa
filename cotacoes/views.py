@@ -161,6 +161,14 @@ def fechar_negocio(request, cotacao_id):
         messages.error(request, "Cotação não encontrada.")
         return redirect("dashboard")
 
+    if Apolice.objects.filter(cotacao_mongo_id=str(cotacao_id)).exists():
+        messages.warning(request, "Esta cotação já foi fechada e possui apólice emitida.")
+        return redirect("dashboard")
+
+    if cotacao["parecer_ia"]["status"] == "Recusada":
+        messages.error(request, "Cotações recusadas pela IA não podem virar apólice.")
+        return redirect("dashboard")
+
     cliente = get_object_or_404(Cliente, pk=cotacao["cliente_id"])
     bem = get_object_or_404(Bem, pk=cotacao["bem_id"])
     planos_disponiveis = Plano.objects.filter(
@@ -218,6 +226,7 @@ def dashboard(request):
 
     # Monta a lista de cotações recentes já com nome do cliente e tipo do bem,
     # pra exibir numa tabela sem o template precisar consultar o banco.
+    ids_fechados = set(Apolice.objects.values_list("cotacao_mongo_id", flat=True))
     recentes = []
     for c in cotacoes[:10]:
         cliente = Cliente.objects.filter(pk=c["cliente_id"]).first()
@@ -228,6 +237,7 @@ def dashboard(request):
             "status_ia": c["parecer_ia"]["status"],
             "premio": c["resultado_calculo"]["premio"],
             "cotacao_id": str(c["_id"]),
+            "fechada": str(c["_id"]) in ids_fechados,
         })
 
     apolices_ativas = Apolice.objects.filter(status="ativa")
