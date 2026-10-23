@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 
 """
 Django settings for crm_core project.
@@ -16,7 +17,7 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / ".env")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -79,11 +80,11 @@ WSGI_APPLICATION = 'crm_core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'frank_costa_crm',
-        'USER': 'postgres',
-        'PASSWORD': '12345',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv("DB_NAME", "frank_costa_crm"),
+        'USER': os.getenv("DB_USER", "postgres"),
+        'PASSWORD': os.getenv("DB_PASSWORD"),
+        'HOST': os.getenv("DB_HOST", "localhost"),
+        'PORT': os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -132,8 +133,8 @@ MAILERS = {
     },
 }
 # Conexão MongoDB (RNF02 - persistência híbrida)
-MONGO_URI = "mongodb://localhost:27017"
-MONGO_DB_NAME = "frank_costa_cotacoes"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "frank_costa_cotacoes")
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
