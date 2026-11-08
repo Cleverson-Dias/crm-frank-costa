@@ -43,9 +43,14 @@
                         <li class="nav-item ms-lg-2">
                             <a class="btn btn-primary-custom" href="{% url 'nova_cotacao' %}">Nova Cotação</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link analytics-link" href="http://localhost:8501" target="_blank" rel="noopener">
+                                <i class="bi bi-bar-chart-line me-1"></i> Painel analítico
+                            </a>
+                        </li>
                         <li class="nav-item dropdown ms-lg-2">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi-person-circle me-1"></i> {{ user.username }}
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Conta de Frank Costa">
+                                <i class="bi-person-circle me-1"></i> Frank Costa
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 {% if user.is_staff %}

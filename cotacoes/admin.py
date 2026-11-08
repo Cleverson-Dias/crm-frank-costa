@@ -9,14 +9,14 @@ desenvolvimento no fluxo principal do CRM (cotação → cliente).
 """
 
 from django.contrib import admin
-from .models import Cliente, Bem, Seguradora, Plano, Apolice
+from .models import Cliente, Bem, Seguradora, Plano, Apolice, RenovacaoApolice
 
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ("nome", "cpf", "email", "telefone", "ativo")
+    list_display = ("nome", "cpf", "email", "telefone", "ativo", "dados_sinteticos")
     search_fields = ("nome", "cpf")
-    list_filter = ("ativo",)
+    list_filter = ("ativo", "dados_sinteticos")
 
 
 @admin.register(Bem)
@@ -46,3 +46,11 @@ class ApoliceAdmin(admin.ModelAdmin):
     list_filter = ("status", "seguradora")
     search_fields = ("numero_apolice", "cliente__nome")
     date_hierarchy = "data_inicio"
+
+
+@admin.register(RenovacaoApolice)
+class RenovacaoApoliceAdmin(admin.ModelAdmin):
+    list_display = ("apolice", "data_vencimento", "status", "apolice_renovada", "data_decisao")
+    list_filter = ("status", "data_vencimento")
+    search_fields = ("apolice__numero_apolice", "apolice__cliente__nome")
+    date_hierarchy = "data_vencimento"

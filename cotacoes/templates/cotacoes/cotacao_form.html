@@ -46,33 +46,163 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Tipo de Seguro</label>
-                            <select name="tipo_seguro" class="form-select">
+                            <select name="tipo_seguro" id="tipo-seguro" class="form-select" required>
                                 <option value="auto">Automóvel</option>
-                                <option value="residencial">Residencial</option>
                                 <option value="vida">Vida</option>
+                                <option value="saude">Saúde</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Valor do Bem (R$)</label>
-                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex: 85000" step="0.01" required>
+                            <label for="valor-bem" id="valor-label" class="form-label small fw-semibold">Valor do Veículo (R$)</label>
+                            <input type="number" name="valor_bem" id="valor-bem" class="form-control" placeholder="Ex: 85000" min="0.01" step="0.01" required>
+                            <span id="valor-ajuda" class="form-text">Informe o valor estimado do veículo.</span>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-ramo="auto">
                             <label class="form-label small fw-semibold">Uso do Veículo</label>
                             <select name="uso_veiculo" class="form-select">
                                 <option value="passeio">Lazer / Passeio</option>
                                 <option value="trabalho">Trabalho / Uber</option>
                                 <option value="carga">Comercial / Carga</option>
                             </select>
-                            <span class="form-text">Registrado para análises futuras — ainda não influencia o cálculo.</span>
+                        </div>
+                        <div class="col-12 row g-3" data-ramo="vida" hidden>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Declaração Pessoal de Saúde completa</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="dps_completa" class="form-check-input" checked>
+                                    <label class="form-check-label">Sim, dados declarados para esta simulação</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="dps_compativel" class="form-check-input" checked>
+                                    <label class="form-check-label">Informações compatíveis com a proposta</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Condições declaradas (se aplicável)</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="doenca_relevante_declarada" class="form-check-input">
+                                    <label class="form-check-label">Doença relevante declarada</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="internacao_recente" class="form-check-input">
+                                    <label class="form-check-label">Internação recente</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Hábitos ou atividade de risco (se aplicável)</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="tabagismo" class="form-check-input">
+                                    <label class="form-check-label">Tabagismo</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="alcool_elevado" class="form-check-input">
+                                    <label class="form-check-label">Consumo elevado de álcool</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="profissao_risco" class="form-check-input">
+                                    <label class="form-check-label">Profissão de alto risco</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="esporte_radical" class="form-check-input">
+                                    <label class="form-check-label">Prática de esporte radical</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 row g-3" data-ramo="saude" hidden>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Segmentação contratada</label>
+                                <select name="segmentacao_contratada" class="form-select" data-obrigatorio>
+                                    <option value="ambulatorial">Ambulatorial</option>
+                                    <option value="hospitalar">Hospitalar</option>
+                                    <option value="hospitalar_obstetricia">Hospitalar com obstetrícia</option>
+                                    <option value="referencia">Referência</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Tipo de atendimento</label>
+                                <select name="tipo_atendimento" class="form-select" data-obrigatorio>
+                                    <option value="demais">Demais procedimentos</option>
+                                    <option value="urgencia_emergencia">Urgência / emergência</option>
+                                    <option value="parto">Parto</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Dias desde o início do contrato</label>
+                                <input type="number" name="dias_contrato" class="form-control" min="0" value="365" data-obrigatorio>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Cobertura exigida</label>
+                                <select name="cobertura_exigida" class="form-select">
+                                    <option value="ambulatorial">Ambulatorial</option>
+                                    <option value="hospitalar">Hospitalar</option>
+                                    <option value="obstetricia">Obstetrícia</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="no_rol_ans" class="form-check-input" checked>
+                                    <label class="form-check-label">Procedimento previsto no Rol da ANS</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="dentro_abrangencia" class="form-check-input" checked>
+                                    <label class="form-check-label">Atendimento dentro da abrangência</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="dlp_declarada" class="form-check-input">
+                                    <label class="form-check-label">Doença ou lesão preexistente declarada</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="relacionado_dlp" class="form-check-input">
+                                    <label class="form-check-label">Procedimento relacionado à declaração</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="alta_complexidade" class="form-check-input">
+                                    <label class="form-check-label">Procedimento de alta complexidade</label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <button type="submit" class="btn btn-primary-custom w-100 py-2 fw-bold">
-                        <i class="bi-cpu"></i> Calcular e Processar com IA Simbólica
+                        <i class="bi-cpu"></i> Analisar e Calcular
                     </button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const tipoSeguro = document.getElementById("tipo-seguro");
+    const valorLabel = document.getElementById("valor-label");
+    const valorAjuda = document.getElementById("valor-ajuda");
+    const configuracoes = {
+        auto: ["Valor do Veículo (R$)", "Informe o valor estimado do veículo."],
+        vida: ["Capital Segurado (R$)", "Informe o capital solicitado para a cobertura de vida."],
+        saude: ["Mensalidade estimada (R$)", "Informe o valor mensal informado pela operadora."]
+    };
+
+    function atualizarCamposPorRamo() {
+        const ramo = tipoSeguro.value;
+        const [rotulo, ajuda] = configuracoes[ramo];
+        valorLabel.textContent = rotulo;
+        valorAjuda.textContent = ajuda;
+
+        document.querySelectorAll("[data-ramo]").forEach((grupo) => {
+            const ativo = grupo.dataset.ramo === ramo;
+            grupo.hidden = !ativo;
+            grupo.querySelectorAll("input, select").forEach((campo) => {
+                campo.disabled = !ativo;
+                campo.required = ativo && campo.hasAttribute("data-obrigatorio");
+            });
+        });
+    }
+
+    tipoSeguro.addEventListener("change", atualizarCamposPorRamo);
+    atualizarCamposPorRamo();
+</script>
 {% endblock %}

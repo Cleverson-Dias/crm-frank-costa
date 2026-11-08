@@ -24,9 +24,9 @@
         </div>
         <div class="col-6 col-lg-3">
             <div class="card-app indicator-card">
-                <span class="indicator-label">Taxa de Aprovação</span>
+                <span class="indicator-label">Pareceres Favoráveis</span>
                 <span class="indicator-value">{{ taxa_aprovacao }}%</span>
-                <span class="indicator-note">Pareceres "Aprovada" pela IA Simbólica</span>
+                <span class="indicator-note">Conforme as regras do ramo de seguro</span>
             </div>
         </div>
         <div class="col-6 col-lg-3">
@@ -69,7 +69,7 @@
                     {% for c in cotacoes_recentes %}
                     <tr>
                         <td>{{ c.cliente_nome }}</td>
-                        <td class="text-capitalize">{{ c.tipo_seguro }}</td>
+                        <td>{{ c.tipo_seguro }}</td>
                         <td>R$ {{ c.valor_bem|floatformat:2 }}</td>
                         <td>
                             <span class="status-badge status-{{ c.status_ia|slugify }}">{{ c.status_ia }}</span>

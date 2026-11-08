@@ -29,22 +29,30 @@
             <div class="card-app">
                 <h6 class="fw-bold text-muted mb-3 small text-uppercase">Estimativa de Valores</h6>
                 <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted small">Prêmio Anual Estimado:</span>
+                    <span class="text-muted small">
+                        {% if tipo_seguro == "saude" %}Mensalidade Anualizada:{% else %}Prêmio Anual Estimado:{% endif %}
+                    </span>
                     <span class="fw-bold fs-5">R$ {{ resultado_calculo.premio }}</span>
                 </div>
+                {% if tipo_seguro != "saude" %}
                 <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted small">Valor da Franquia:</span>
                     <span class="fw-semibold">R$ {{ resultado_calculo.franquia }}</span>
                 </div>
                 <div class="d-flex justify-content-between border-top pt-2 mt-2">
-                    <span class="text-muted small">Margem da Corretora:</span>
+                    <span class="text-muted small">Comissão estimada (referência):</span>
                     <span class="fw-bold text-success">R$ {{ resultado_calculo.margem }}</span>
                 </div>
+                {% else %}
+                <p class="text-muted small border-top pt-2 mt-2 mb-0">
+                    A comissão do plano de saúde será calculada conforme a seguradora e o plano selecionados.
+                </p>
+                {% endif %}
             </div>
 
             <div class="d-flex gap-3 mt-4">
                 <a href="{% url 'nova_cotacao' %}" class="btn btn-outline-custom">Nova Simulação</a>
-                {% if parecer.status != "Recusada" %}
+                {% if pode_fechar %}
                     <a href="{% url 'fechar_negocio' cotacao_id=cotacao_id %}" class="btn btn-primary-custom">Fechar Negócio</a>
                 {% endif %}
                 <a href="{% url 'dashboard' %}" class="btn btn-outline-custom">Ver no Dashboard</a>

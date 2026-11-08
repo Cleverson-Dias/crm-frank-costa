@@ -9,13 +9,15 @@ persistência de cotações (Mongo/nosql.py).
 import json
 import random
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 
-from .models import Cliente, Bem, Seguradora, Plano, Apolice
+from .models import Cliente, Bem, Seguradora, Plano, Apolice, TIPOS_SEGURO_ATIVOS
+from .analytics import PARECERES_FAVORAVEIS
 from . import motor_ia
 from . import nosql
 from .utils import somente_digitos
@@ -70,23 +72,68 @@ def nova_cotacao(request):
         return render(request, "cotacoes/cotacao_form.html")
 
     # --- POST: processa a simulação completa ---
-    nome = request.POST["nome"]
-    cpf = somente_digitos(request.POST["cpf"])
+    nome = request.POST.get("nome", "").strip()
+    cpf = somente_digitos(request.POST.get("cpf", ""))
     email = request.POST.get("email", "")
     telefone = somente_digitos(request.POST.get("telefone", ""))
-    tipo_seguro = request.POST["tipo_seguro"]
-    valor_bem = float(request.POST["valor_bem"])
-    idade = int(request.POST["idade"])
-    uso_veiculo = request.POST.get("uso_veiculo", "")  # ainda não entra no cálculo, ver nota no README
+    tipo_seguro = request.POST.get("tipo_seguro", "")
+    try:
+        if not nome:
+            raise ValueError("Informe o nome do segurado.")
+        if len(cpf) != 11:
+            raise ValueError("Informe um CPF com 11 dígitos.")
+        if tipo_seguro not in dict(TIPOS_SEGURO_ATIVOS):
+            raise ValueError("Selecione um ramo de seguro válido.")
+        idade = int(request.POST["idade"])
+        valor_informado = Decimal(request.POST["valor_bem"])
+        dias_contrato = int(request.POST.get("dias_contrato") or 0) if tipo_seguro == "saude" else 0
+        valor_estimado = valor_informado * 12 if tipo_seguro == "saude" else valor_informado
+        if idade < 0 or idade > 120 or not valor_informado.is_finite() or valor_informado <= 0:
+            raise ValueError("Confira a idade e o valor informado.")
+        if valor_estimado > Decimal("9999999999.99"):
+            raise ValueError("O valor informado excede o limite aceito para esta cotação.")
+        if dias_contrato < 0:
+            raise ValueError("Os dias de contrato não podem ser negativos.")
+    except (KeyError, InvalidOperation, ValueError):
+        messages.error(request, "Informe um ramo, idade e valor válidos para a cotação.")
+        return render(request, "cotacoes/cotacao_form.html")
 
-    # O formulário só coleta a idade (não a data de nascimento completa),
-    # então aproximamos a data de nascimento a partir dela. Suficiente
-    # para o cadastro do cliente nesta etapa do projeto; pode ser
-    # substituído por um campo de data real no formulário depois.
+    dados_especificos = {}
+    if tipo_seguro == "auto":
+        dados_especificos = {"uso_veiculo": request.POST.get("uso_veiculo", "")}
+        valor_bem = float(valor_informado)
+    elif tipo_seguro == "vida":
+        valor_bem = float(valor_informado)
+        dados_especificos = {
+            "capital_segurado": valor_bem,
+            "dps_completa": request.POST.get("dps_completa") == "on",
+            "dps_compativel": request.POST.get("dps_compativel") == "on",
+            "tabagismo": request.POST.get("tabagismo") == "on",
+            "alcool_elevado": request.POST.get("alcool_elevado") == "on",
+            "doenca_relevante_declarada": request.POST.get("doenca_relevante_declarada") == "on",
+            "internacao_recente": request.POST.get("internacao_recente") == "on",
+            "profissao_risco": request.POST.get("profissao_risco") == "on",
+            "esporte_radical": request.POST.get("esporte_radical") == "on",
+        }
+    else:
+        valor_bem = float(valor_informado * 12)
+        dados_especificos = {
+            "operacao": "atendimento",
+            "segmentacao_contratada": request.POST.get("segmentacao_contratada", ""),
+            "tipo_atendimento": request.POST.get("tipo_atendimento", ""),
+            "dias_contrato": dias_contrato,
+            "cobertura_exigida": request.POST.get("cobertura_exigida", ""),
+            "no_rol_ans": request.POST.get("no_rol_ans") == "on",
+            "dentro_abrangencia": request.POST.get("dentro_abrangencia") == "on",
+            "dlp_declarada": request.POST.get("dlp_declarada") == "on",
+            "relacionado_dlp": request.POST.get("relacionado_dlp") == "on",
+            "alta_complexidade": request.POST.get("alta_complexidade") == "on",
+        }
+
     hoje = date.today()
     try:
         data_nascimento_aproximada = hoje.replace(year=hoje.year - idade)
-    except ValueError:  # 29 de fevereiro em ano não bissexto
+    except ValueError:
         data_nascimento_aproximada = hoje.replace(year=hoje.year - idade, day=28)
 
     cliente, criado = Cliente.objects.get_or_create(
@@ -99,9 +146,6 @@ def nova_cotacao(request):
         },
     )
 
-    # Se o cliente já existia e algum desses campos veio preenchido agora
-    # mas estava vazio no cadastro, aproveita para completar o cadastro
-    # (sem sobrescrever dados já existentes, só preenchendo lacunas).
     if not criado:
         atualizou = False
         if email and not cliente.email:
@@ -116,11 +160,11 @@ def nova_cotacao(request):
     bem = Bem.objects.create(
         cliente=cliente,
         tipo=tipo_seguro,
-        descricao=f"{cliente.nome} - {tipo_seguro}",
-        valor_estimado=valor_bem,
+        descricao=f"{cliente.nome} - {dict(Bem.TIPO_CHOICES).get(tipo_seguro, tipo_seguro)}",
+        valor_estimado=valor_estimado,
     )
 
-    perfil = {"idade": idade, "valor_bem": valor_bem}
+    perfil = {"idade": idade, "valor_bem": valor_bem, "tipo_seguro": tipo_seguro, **dados_especificos}
 
     # 1) IA Simbólica decide o parecer (RF04/RF05)
     parecer = motor_ia.avaliar_elegibilidade(perfil)
@@ -142,6 +186,13 @@ def nova_cotacao(request):
     contexto = {
         "cliente": cliente,
         "bem": bem,
+        "tipo_seguro": tipo_seguro,
+        "pode_fechar": parecer["status"] not in {
+            "Recusada",
+            "Não Coberto",
+            "Pendência de Dados",
+            "Erro de Parâmetro",
+        },
         "parecer": parecer,
         "resultado_calculo": resultado_calculo,
         "cotacao_id": cotacao_id,
@@ -165,14 +216,20 @@ def fechar_negocio(request, cotacao_id):
         messages.warning(request, "Esta cotação já foi fechada e possui apólice emitida.")
         return redirect("dashboard")
 
-    if cotacao["parecer_ia"]["status"] == "Recusada":
-        messages.error(request, "Cotações recusadas pela IA não podem virar apólice.")
+    parecer_ia = cotacao.get("parecer_ia") or {}
+    if parecer_ia.get("status") in {
+        "Recusada",
+        "Não Coberto",
+        "Pendência de Dados",
+        "Erro de Parâmetro",
+    }:
+        messages.error(request, "Esta cotação não pode virar apólice com o parecer atual.")
         return redirect("dashboard")
 
-    cliente = get_object_or_404(Cliente, pk=cotacao["cliente_id"])
-    bem = get_object_or_404(Bem, pk=cotacao["bem_id"])
+    cliente = get_object_or_404(Cliente, pk=cotacao.get("cliente_id"))
+    bem = get_object_or_404(Bem, pk=cotacao.get("bem_id"))
     planos_disponiveis = Plano.objects.filter(
-        tipo_seguro=cotacao["tipo_seguro"], ativo=True, seguradora__ativa=True
+        tipo_seguro=cotacao.get("tipo_seguro"), ativo=True, seguradora__ativa=True
     ).select_related("seguradora")
 
     if request.method == "GET":
@@ -186,11 +243,19 @@ def fechar_negocio(request, cotacao_id):
         return render(request, "cotacoes/fechar_negocio.html", contexto)
 
     # --- POST: cria a Apólice de verdade ---
-    plano = get_object_or_404(Plano, pk=request.POST["plano_id"])
+    plano = get_object_or_404(
+        Plano,
+        pk=request.POST["plano_id"],
+        tipo_seguro=cotacao.get("tipo_seguro"),
+        ativo=True,
+        seguradora__ativa=True,
+    )
     hoje = date.today()
 
+    calc = cotacao.get("resultado_calculo") or {}
     numero_apolice = f"AP-{hoje.year}-{random.randint(100000, 999999)}"
-    valor_premio = cotacao["resultado_calculo"]["premio"]
+    valor_premio = calc.get("premio_bruto") or calc.get("premio", 0)
+    valor_franquia = calc.get("franquia", 0)
     valor_comissao = round(float(valor_premio) * float(plano.comissao_efetiva()) / 100, 2)
 
     Apolice.objects.create(
@@ -201,7 +266,7 @@ def fechar_negocio(request, cotacao_id):
         cotacao_mongo_id=str(cotacao_id),
         numero_apolice=numero_apolice,
         valor_premio=valor_premio,
-        valor_franquia=cotacao["resultado_calculo"]["franquia"],
+        valor_franquia=valor_franquia,
         valor_comissao=valor_comissao,
         data_inicio=hoje,
         data_fim=hoje + timedelta(days=365),
@@ -218,26 +283,47 @@ def fechar_negocio(request, cotacao_id):
 
 @login_required
 def dashboard(request):
-    cotacoes = nosql.listar_todas_cotacoes()
+    cotacoes = nosql.listar_todas_cotacoes() or []
 
     total = len(cotacoes)
-    aprovadas = sum(1 for c in cotacoes if c["parecer_ia"]["status"] == "Aprovada")
-    faturamento_estimado = sum(c["resultado_calculo"]["margem"] for c in cotacoes)
 
-    # Monta a lista de cotações recentes já com nome do cliente e tipo do bem,
-    # pra exibir numa tabela sem o template precisar consultar o banco.
+    # Contagem segura de cotações aprovadas
+    aprovadas = sum(
+        1 for c in cotacoes
+        if isinstance(c.get("parecer_ia"), dict)
+        and c["parecer_ia"].get("status") in PARECERES_FAVORAVEIS
+    )
+
+    # Cálculo seguro do faturamento estimado (suporta 'comissao_corretora' ou 'margem')
+    faturamento_estimado = 0.0
+    for c in cotacoes:
+        calc = c.get("resultado_calculo")
+        if isinstance(calc, dict):
+            faturamento_estimado += float(calc.get("comissao_corretora") or calc.get("margem") or 0)
+
+    # Monta a lista de cotações recentes
     ids_fechados = set(Apolice.objects.values_list("cotacao_mongo_id", flat=True))
     recentes = []
     for c in cotacoes[:10]:
-        cliente = Cliente.objects.filter(pk=c["cliente_id"]).first()
+        cliente_id = c.get("cliente_id")
+        cliente = Cliente.objects.filter(pk=cliente_id).first() if cliente_id else None
+
+        calc = c.get("resultado_calculo") if isinstance(c.get("resultado_calculo"), dict) else {}
+        parecer = c.get("parecer_ia") if isinstance(c.get("parecer_ia"), dict) else {}
+        dados_bem = c.get("dados_bem") or c.get("dados") or {}
+
+        cot_id_str = str(c.get("_id", ""))
+
         recentes.append({
             "cliente_nome": cliente.nome if cliente else "Cliente removido",
-            "tipo_seguro": c["tipo_seguro"],
-            "valor_bem": c["dados"].get("valor_bem", 0),
-            "status_ia": c["parecer_ia"]["status"],
-            "premio": c["resultado_calculo"]["premio"],
-            "cotacao_id": str(c["_id"]),
-            "fechada": str(c["_id"]) in ids_fechados,
+            "tipo_seguro": dict(Bem.TIPO_CHOICES).get(
+                c.get("tipo_seguro"), c.get("tipo_seguro", "N/A")
+            ),
+            "valor_bem": dados_bem.get("valor_fipe") or dados_bem.get("valor_bem", 0),
+            "status_ia": parecer.get("status", "N/A"),
+            "premio": calc.get("premio_bruto") or calc.get("premio", 0),
+            "cotacao_id": cot_id_str,
+            "fechada": cot_id_str in ids_fechados,
         })
 
     apolices_ativas = Apolice.objects.filter(status="ativa")

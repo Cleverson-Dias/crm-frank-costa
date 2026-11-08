@@ -72,6 +72,15 @@ h1, h2, h3, h4, h5, .display-5 {
     background-color: var(--verde-suave);
 }
 
+.analytics-link {
+    color: var(--verde-marca-escuro) !important;
+    font-weight: 600;
+}
+
+.analytics-link:hover {
+    color: var(--verde-marca-escuro) !important;
+}
+
 /* ==========================================================================
    Botões
    ========================================================================== */

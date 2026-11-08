@@ -4,14 +4,14 @@ nosql.py
 Camada de persistência NÃO-RELACIONAL (MongoDB) do CRM Frank Costa.
 
 RF02: registrar cotações/simulações com campos dinâmicos por tipo de
-seguro (auto, vida, residencial), sem exigir schema rígido.
+seguro (auto, vida, saúde), sem exigir schema rígido.
 
 Cada documento salvo tem esta forma-base (o resto varia por tipo):
 
 {
     "cliente_id": 12,                # FK "solta" para o Postgres
     "bem_id": 7,
-    "tipo_seguro": "auto",
+    "tipo_seguro": "auto",              # "auto", "vida" ou "saude"
     "dados": { ... campos específicos do tipo ... },
     "resultado_calculo": {"premio": 1200.50, "franquia": 800.0, "margem": 180.0},
     "parecer_ia": {"status": "Aprovada", "regra_id": "R03", "motivo": "..."},

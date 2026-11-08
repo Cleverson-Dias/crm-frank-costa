@@ -9,7 +9,19 @@ seguro) NÃO entram aqui — elas vivem no MongoDB (ver nosql.py),
 conforme RNF02 (persistência híbrida).
 """
 
+from django.core.exceptions import ValidationError
 from django.db import models
+
+
+TIPOS_SEGURO_ATIVOS = [
+    ("auto", "Automóvel"),
+    ("vida", "Vida"),
+    ("saude", "Saúde"),
+]
+
+TIPOS_SEGURO_LEGADOS = [
+    ("residencial", "Residencial (histórico)"),
+]
 
 
 class Cliente(models.Model):
@@ -21,6 +33,7 @@ class Cliente(models.Model):
     email = models.EmailField(blank=True)
     telefone = models.CharField(max_length=20, blank=True)
     ativo = models.BooleanField(default=True)  # suporta "inativar" (RF01), não deleta
+    dados_sinteticos = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -33,26 +46,25 @@ class Cliente(models.Model):
 
 class Bem(models.Model):
     """
-    Bem segurado vinculado a um cliente: veículo, imóvel ou objeto
-    de seguro de vida (pessoa segurada / dependente).
+    Bem ou referência segurada vinculada a um cliente: veículo, capital
+    de vida ou plano de saúde.
 
-    O detalhamento fino e variável de cada tipo (placa, ano, m²,
-    histórico de saúde etc.) fica na cotação NoSQL — aqui guardamos só
-    o essencial para o cadastro relacional funcionar como cadastro.
+    Os detalhes variáveis de cada ramo ficam na cotação NoSQL. O ramo
+    residencial é mantido somente para identificar registros históricos.
     """
 
-    TIPO_CHOICES = [
-        ("auto", "Automóvel"),
-        ("residencial", "Residencial"),
-        ("vida", "Vida"),
-    ]
+    TIPO_CHOICES = TIPOS_SEGURO_ATIVOS + TIPOS_SEGURO_LEGADOS
 
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="bens")
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
-    descricao = models.CharField(max_length=200)  # ex: "Honda Civic 2022" / "Apto 80m² - Ipiranga"
+    descricao = models.CharField(max_length=200)
     valor_estimado = models.DecimalField(max_digits=12, decimal_places=2)
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Bem"
+        verbose_name_plural = "Bens"
 
     def __str__(self):
         return f"{self.get_tipo_display()} - {self.descricao}"
@@ -153,3 +165,57 @@ class Apolice(models.Model):
 
     def __str__(self):
         return f"{self.numero_apolice} - {self.cliente.nome}"
+
+
+class RenovacaoApolice(models.Model):
+    """Resultado da tentativa de renovação de uma apólice vencida."""
+
+    STATUS_CHOICES = [
+        ("pendente", "Pendente"),
+        ("renovada", "Renovada"),
+        ("nao_renovada", "Não renovada"),
+    ]
+
+    apolice = models.ForeignKey(
+        Apolice, on_delete=models.CASCADE, related_name="historico_renovacoes"
+    )
+    apolice_renovada = models.ForeignKey(
+        Apolice, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="renovacoes_resultantes",
+    )
+    data_vencimento = models.DateField()
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="pendente")
+    data_decisao = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-data_vencimento"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["apolice", "data_vencimento"],
+                name="uq_renovacao_apolice_vencimento",
+            ),
+        ]
+
+    def clean(self):
+        if self.status == "renovada" and not self.apolice_renovada_id:
+            raise ValidationError({
+                "apolice_renovada": "Informe a apólice emitida para registrar a renovação."
+            })
+        if self.status != "renovada" and self.apolice_renovada_id:
+            raise ValidationError({
+                "apolice_renovada": "Somente renovações concluídas podem apontar para uma nova apólice."
+            })
+        if self.apolice_id and self.apolice_renovada_id:
+            if self.apolice_id == self.apolice_renovada_id:
+                raise ValidationError({
+                    "apolice_renovada": "A nova apólice deve ser diferente da apólice original."
+                })
+            origem = self.apolice
+            nova = self.apolice_renovada
+            if origem.cliente_id != nova.cliente_id or origem.bem.tipo != nova.bem.tipo:
+                raise ValidationError({
+                    "apolice_renovada": "A renovação deve pertencer ao mesmo cliente e ramo da apólice original."
+                })
+
+    def __str__(self):
+        return f"Renovação de {self.apolice.numero_apolice} ({self.get_status_display()})"
