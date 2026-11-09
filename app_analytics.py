@@ -150,9 +150,18 @@ st.markdown(
     div[data-testid="stMetric"] {{
         background:#fff; border:1px solid var(--line); border-radius:.9rem;
         padding:1rem 1.1rem; box-shadow:0 5px 16px rgba(24,62,49,.045);
-        min-height:7.1rem;
+        min-height:7.8rem;
     }}
-    div[data-testid="stMetricLabel"] p {{ color:#52675f !important; font-size:.79rem; font-weight:650; }}
+    [data-testid="stMetricLabel"] {{ min-height:2.3rem; align-items:flex-start; }}
+    [data-testid="stMetricLabel"] [data-testid="stMarkdownContainer"] {{
+        white-space:normal !important; overflow:visible !important;
+        text-overflow:clip !important;
+    }}
+    [data-testid="stMetricLabel"] p {{
+        color:#52675f !important; font-size:.78rem; font-weight:650;
+        white-space:normal !important; overflow:visible !important;
+        text-overflow:clip !important; line-height:1.2;
+    }}
     div[data-testid="stMetricValue"] {{ color:#176f50 !important; font-size:1.48rem; font-weight:750; }}
     div[data-testid="stMetricDelta"] {{ font-size:.73rem; }}
     div[data-testid="stTabs"] button {{ font-weight:650; }}
@@ -213,8 +222,16 @@ def carregar_cotacoes():
 
 @st.cache_data(ttl=60, show_spinner="Atualizando carteira e histórico...")
 def carregar_dados_relacionais(ramos, data_inicio, data_fim, incluir_demonstracao):
+    apolices_ativas_filtro = Apolice.objects.filter(
+        status="ativa",
+        bem__tipo__in=ramos,
+    )
+    if not incluir_demonstracao:
+        apolices_ativas_filtro = apolices_ativas_filtro.filter(
+            cliente__dados_sinteticos=False
+        )
     apolices_ativas_qs = (
-        Apolice.objects.filter(status="ativa", bem__tipo__in=ramos)
+        apolices_ativas_filtro
         .select_related("cliente", "bem", "seguradora", "plano")
         .order_by("cliente__nome")
     )
@@ -246,10 +263,15 @@ def carregar_dados_relacionais(ramos, data_inicio, data_fim, incluir_demonstraca
         .distinct()
         .count()
     )
+    cotacoes_fechadas_qs = Apolice.objects.filter(bem__tipo__in=ramos)
+    if not incluir_demonstracao:
+        cotacoes_fechadas_qs = cotacoes_fechadas_qs.filter(
+            cliente__dados_sinteticos=False
+        )
     ids_cotacoes_fechadas = list(
-        Apolice.objects.filter(bem__tipo__in=ramos)
-        .exclude(cotacao_mongo_id="")
-        .values_list("cotacao_mongo_id", flat=True)
+        cotacoes_fechadas_qs.exclude(cotacao_mongo_id="").values_list(
+            "cotacao_mongo_id", flat=True
+        )
     )
     renovacoes = RenovacaoApolice.objects.filter(
         data_vencimento__gte=data_inicio,
@@ -257,6 +279,8 @@ def carregar_dados_relacionais(ramos, data_inicio, data_fim, incluir_demonstraca
         status__in=["renovada", "nao_renovada"],
         apolice__bem__tipo__in=ramos,
     )
+    if not incluir_demonstracao:
+        renovacoes = renovacoes.filter(apolice__cliente__dados_sinteticos=False)
     renovacoes_por_status = list(
         renovacoes.values("status")
         .annotate(total=Count("id"))
@@ -589,6 +613,18 @@ if not df_receitas.empty:
         )
         .sort_values("mes_referencia")
     )
+    inicio_mes = pd.Timestamp(data_inicio.year, data_inicio.month, 1)
+    fim_mes = pd.Timestamp(data_fim.year, data_fim.month, 1)
+    meses_selecionados = pd.date_range(inicio_mes, fim_mes, freq="MS")
+    receitas_por_mes["mes_referencia"] = pd.to_datetime(
+        receitas_por_mes["mes_referencia"]
+    )
+    receitas_por_mes = (
+        receitas_por_mes.set_index("mes_referencia")
+        .reindex(meses_selecionados, fill_value=0)
+        .rename_axis("mes_referencia")
+        .reset_index()
+    )
     receita_media_mensal = receitas_por_mes["comissao_bruta"].mean()
     liquido_medio_mensal = receitas_por_mes["liquido_estimado"].mean()
 taxa_retencao = calcular_taxa_retencao(
@@ -621,39 +657,46 @@ st.caption(
 )
 
 kpis = st.columns(5)
-kpis[0].metric("Clientes na carteira", f"{dados_relacionais['clientes_na_carteira']:,}")
-kpis[1].metric("Apólices vigentes", f"{len(apolices):,}")
+kpis[0].metric(
+    "Clientes ativos",
+    f"{dados_relacionais['clientes_na_carteira']:,}",
+    help="Clientes distintos com ao menos uma apólice vigente nos ramos selecionados.",
+)
+kpis[1].metric(
+    "Apólices vigentes",
+    f"{len(apolices):,}",
+    help="Quantidade de apólices com status ativo nos ramos selecionados.",
+)
 kpis[2].metric(
-    "Comissão bruta média mensal",
+    "Comissão bruta/mês",
     formatar_moeda(receita_media_mensal) if receita_media_mensal is not None else "Sem base",
-    help="Média mensal do cenário demonstrativo no período e ramos selecionados.",
+    help="Média mensal das comissões brutas dos ramos selecionados no período. Meses sem valor entram como zero.",
 )
 kpis[3].metric(
-    "Líquido médio estimado",
+    "Líquido estimado/mês",
     formatar_moeda(liquido_medio_mensal) if liquido_medio_mensal is not None else "Sem base",
-    help="Comissão bruta demonstrativa × margem líquida estimada de 75%.",
+    help="Média mensal após a margem estimada de 75%, considerando período e ramos selecionados.",
 )
 kpis[4].metric(
-    "Retenção de renovações",
+    "Retenção",
     f"{taxa_retencao:.1f}%" if taxa_retencao is not None else "Sem base",
     help=(
         f"{dados_relacionais['renovacoes_concluidas']} renovadas de "
-        f"{dados_relacionais['renovacoes_elegiveis']} decisões no período selecionado."
+        f"{dados_relacionais['renovacoes_elegiveis']} decisões no período e ramos selecionados."
     ),
 )
 st.caption(
-    "As receitas mensais são valores fictícios de demonstração entre R$ 6 mil e R$ 12 mil. "
-    "O líquido é estimado com margem acadêmica de 75%; não representa resultado contábil."
+    "O líquido mensal é estimado com margem acadêmica de 75%; não representa resultado contábil."
 )
 st.markdown(
-    '<div class="data-note">O período filtra cotações, receitas demonstrativas e renovações. '
-    'A carteira e as apólices vigentes consideram os ramos selecionados.</div>',
+    '<div class="data-note">Período e ramos atualizam cotações, comissões e renovações. '
+    'Pareceres filtram as cotações; a carteira considera os ramos selecionados.</div>',
     unsafe_allow_html=True,
 )
 
 st.markdown('<div class="section-heading">Comissão bruta mês a mês</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="section-note">Cenário fictício: com os três ramos selecionados, o total mensal foi gerado entre R$ 6 mil e R$ 12 mil. Com menos ramos, o gráfico mostra apenas o subtotal.</div>',
+    '<div class="section-note">Soma mensal para o período e os ramos selecionados. O filtro de pareceres afeta somente os gráficos e indicadores de cotações.</div>',
     unsafe_allow_html=True,
 )
 if receitas_por_mes.empty:
@@ -723,6 +766,17 @@ with tab_cotacoes:
                 mes=df["criado_em"].dt.tz_localize(None).dt.to_period("M").dt.to_timestamp()
             )
             mensal = mensal.groupby("mes").size().reset_index(name="Cotações")
+            meses_selecionados = pd.date_range(
+                start=pd.Timestamp(data_inicio.year, data_inicio.month, 1),
+                end=pd.Timestamp(data_fim.year, data_fim.month, 1),
+                freq="MS",
+            )
+            mensal = (
+                mensal.set_index("mes")
+                .reindex(meses_selecionados, fill_value=0)
+                .rename_axis("mes")
+                .reset_index()
+            )
             mensal["Mês"] = mensal["mes"].map(
                 lambda mes: f"{MESES[mes.month - 1][:3].capitalize()}/{mes.year}"
             )

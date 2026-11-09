@@ -24,11 +24,14 @@ A triagem de elegibilidade de uma cotação não usa um `if/elif`. É um **siste
 
 Cada decisão carrega uma **trilha de inferência** — qual regra disparou, em que ordem, e por quê. Ela apoia a explicabilidade do parecer, mas não representa, por si só, uma certificação de conformidade com a LGPD.
 
+Os campos de automóvel consideram informações usuais para cotação, como marca, modelo, ano, uso, tempo de habilitação, sinistros e eventual condutor adicional. Os limites e pareceres do motor são regras internas de demonstração e não substituem a subscrição nem as tarifas de uma seguradora.
+
 ---
 
 ## Funcionalidades
 
 - **Gestão de Clientes** — cadastro, consulta e inativação de clientes e seus bens ou referências seguradas (automóvel, vida, saúde)
+- **Nova cotação por ramo** — primeiro seleciona automóvel, vida ou saúde; em seguida, o formulário mostra os campos pertinentes, como veículo e perfil do condutor para automóvel, capital e declarações para vida, ou mensalidade e cobertura para saúde
 - **Cotação com IA Simbólica** — simulação por ramo, parecer explicável e estimativa de prêmio; a comissão efetiva é calculada a partir do plano escolhido
 - **Fechamento de negócio** — converte uma cotação aprovada em apólice real, vinculada a uma seguradora parceira e a um plano específico, com cálculo de comissão
 - **Dashboard gerencial** — indicadores e análises interativas de cotações, conversão, carteira, comissões e renovações

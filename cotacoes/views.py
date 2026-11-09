@@ -61,6 +61,123 @@ def novo_cliente(request):
     return render(request, "cotacoes/cliente_form.html")
 
 
+def montar_perfil_cotacao(dados, tipo_seguro, ano_atual=None):
+    if tipo_seguro not in dict(TIPOS_SEGURO_ATIVOS):
+        raise ValueError("Selecione um ramo de seguro válido.")
+
+    try:
+        idade = int(dados.get("idade", ""))
+        valor_informado = Decimal(dados.get("valor_bem", ""))
+    except (InvalidOperation, TypeError, ValueError) as erro:
+        raise ValueError("Informe uma idade e um valor válidos para a cotação.") from erro
+
+    if idade < 0 or idade > 120 or not valor_informado.is_finite() or valor_informado <= 0:
+        raise ValueError("Confira a idade e o valor informado.")
+    if valor_informado > Decimal("9999999999.99"):
+        raise ValueError("O valor informado excede o limite aceito para esta cotação.")
+
+    perfil = {"idade": idade, "tipo_seguro": tipo_seguro}
+    if tipo_seguro == "auto":
+        marca = dados.get("marca_veiculo", "").strip()
+        modelo = dados.get("modelo_veiculo", "").strip()
+        uso_veiculo = dados.get("uso_veiculo", "")
+        try:
+            ano_modelo = int(dados.get("ano_modelo", ""))
+            tempo_habilitacao = int(dados.get("tempo_habilitacao_anos", ""))
+            sinistros = int(dados.get("sinistros_ultimos_3_anos", ""))
+        except (TypeError, ValueError) as erro:
+            raise ValueError("Confira o ano do veículo, o tempo de habilitação e os sinistros.") from erro
+
+        referencia = ano_atual or date.today().year
+        if not marca or not modelo:
+            raise ValueError("Informe a marca e o modelo do veículo.")
+        if len(marca) > 80 or len(modelo) > 100:
+            raise ValueError("A marca ou o modelo do veículo excede o limite de caracteres.")
+        if ano_modelo < 1900 or ano_modelo > referencia + 1:
+            raise ValueError("Informe um ano de fabricação/modelo válido.")
+        if uso_veiculo not in {"passeio", "trabalho", "carga"}:
+            raise ValueError("Selecione um uso válido para o veículo.")
+        if tempo_habilitacao < 0 or tempo_habilitacao > idade:
+            raise ValueError("Confira o tempo de habilitação do condutor principal.")
+        if sinistros not in {0, 1, 2, 3}:
+            raise ValueError("Informe uma faixa válida de sinistros nos últimos 3 anos.")
+
+        condutor_adicional = dados.get("condutor_adicional") == "on"
+        idade_adicional = None
+        if condutor_adicional:
+            try:
+                idade_adicional = int(dados.get("idade_condutor_adicional", ""))
+            except (TypeError, ValueError) as erro:
+                raise ValueError("Informe a idade do condutor adicional.") from erro
+            if idade_adicional < 18 or idade_adicional > 120:
+                raise ValueError("A idade do condutor adicional deve estar entre 18 e 120 anos.")
+
+        perfil.update({
+            "valor_bem": float(valor_informado),
+            "marca_veiculo": marca,
+            "modelo_veiculo": modelo,
+            "ano_modelo": ano_modelo,
+            "ano_referencia": referencia,
+            "uso_veiculo": uso_veiculo,
+            "uso_profissional": uso_veiculo in {"trabalho", "carga"},
+            "condutor_adicional": condutor_adicional,
+            "idade_condutor_adicional": idade_adicional,
+            "tempo_habilitacao_anos": tempo_habilitacao,
+            "sinistros_ultimos_3_anos": sinistros,
+        })
+        return perfil, valor_informado, valor_informado, f"{marca} {modelo} - {ano_modelo}"
+
+    if tipo_seguro == "vida":
+        capital_segurado = float(valor_informado)
+        perfil.update({
+            "valor_bem": capital_segurado,
+            "capital_segurado": capital_segurado,
+            "dps_completa": dados.get("dps_completa") == "on",
+            "dps_compativel": dados.get("dps_compativel") == "on",
+            "tabagismo": dados.get("tabagismo") == "on",
+            "alcool_elevado": dados.get("alcool_elevado") == "on",
+            "doenca_relevante_declarada": dados.get("doenca_relevante_declarada") == "on",
+            "internacao_recente": dados.get("internacao_recente") == "on",
+            "profissao_risco": dados.get("profissao_risco") == "on",
+            "esporte_radical": dados.get("esporte_radical") == "on",
+        })
+        return perfil, valor_informado, valor_informado, "Capital segurado"
+
+    try:
+        dias_contrato = int(dados.get("dias_contrato", ""))
+    except (TypeError, ValueError) as erro:
+        raise ValueError("Informe os dias desde o início do contrato de saúde.") from erro
+    segmentacao = dados.get("segmentacao_contratada", "")
+    tipo_atendimento = dados.get("tipo_atendimento", "")
+    cobertura = dados.get("cobertura_exigida", "")
+    if segmentacao not in {"ambulatorial", "hospitalar", "hospitalar_obstetricia", "referencia"}:
+        raise ValueError("Selecione uma segmentação válida para o plano de saúde.")
+    if tipo_atendimento not in {"demais", "urgencia_emergencia", "parto"}:
+        raise ValueError("Selecione um tipo de atendimento válido.")
+    if cobertura not in {"ambulatorial", "hospitalar", "obstetricia"}:
+        raise ValueError("Selecione uma cobertura válida.")
+    if dias_contrato < 0:
+        raise ValueError("Os dias de contrato não podem ser negativos.")
+
+    valor_anualizado = valor_informado * 12
+    if valor_anualizado > Decimal("9999999999.99"):
+        raise ValueError("O valor informado excede o limite aceito para esta cotação.")
+    perfil.update({
+        "valor_bem": float(valor_anualizado),
+        "operacao": "atendimento",
+        "segmentacao_contratada": segmentacao,
+        "tipo_atendimento": tipo_atendimento,
+        "dias_contrato": dias_contrato,
+        "cobertura_exigida": cobertura,
+        "no_rol_ans": dados.get("no_rol_ans") == "on",
+        "dentro_abrangencia": dados.get("dentro_abrangencia") == "on",
+        "dlp_declarada": dados.get("dlp_declarada") == "on",
+        "relacionado_dlp": dados.get("relacionado_dlp") == "on",
+        "alta_complexidade": dados.get("alta_complexidade") == "on",
+    })
+    return perfil, valor_anualizado, valor_informado, "Plano de saúde"
+
+
 # ---------------------------------------------------------------------------
 # RF02 + RF03 + RF04 + RF05 - Nova cotação (o fluxo central do sistema)
 # ---------------------------------------------------------------------------
@@ -69,7 +186,7 @@ def novo_cliente(request):
 @require_http_methods(["GET", "POST"])
 def nova_cotacao(request):
     if request.method == "GET":
-        return render(request, "cotacoes/cotacao_form.html")
+        return render(request, "cotacoes/cotacao_form.html", {"form_data": {}})
 
     # --- POST: processa a simulação completa ---
     nome = request.POST.get("nome", "").strip()
@@ -77,64 +194,35 @@ def nova_cotacao(request):
     email = request.POST.get("email", "")
     telefone = somente_digitos(request.POST.get("telefone", ""))
     tipo_seguro = request.POST.get("tipo_seguro", "")
+    if not nome:
+        messages.error(request, "Informe o nome do segurado.")
+        return render(
+            request, "cotacoes/cotacao_form.html", {"form_data": request.POST}
+        )
+    if len(cpf) != 11:
+        messages.error(request, "Informe um CPF com 11 dígitos.")
+        return render(
+            request, "cotacoes/cotacao_form.html", {"form_data": request.POST}
+        )
     try:
-        if not nome:
-            raise ValueError("Informe o nome do segurado.")
-        if len(cpf) != 11:
-            raise ValueError("Informe um CPF com 11 dígitos.")
-        if tipo_seguro not in dict(TIPOS_SEGURO_ATIVOS):
-            raise ValueError("Selecione um ramo de seguro válido.")
-        idade = int(request.POST["idade"])
-        valor_informado = Decimal(request.POST["valor_bem"])
-        dias_contrato = int(request.POST.get("dias_contrato") or 0) if tipo_seguro == "saude" else 0
-        valor_estimado = valor_informado * 12 if tipo_seguro == "saude" else valor_informado
-        if idade < 0 or idade > 120 or not valor_informado.is_finite() or valor_informado <= 0:
-            raise ValueError("Confira a idade e o valor informado.")
-        if valor_estimado > Decimal("9999999999.99"):
-            raise ValueError("O valor informado excede o limite aceito para esta cotação.")
-        if dias_contrato < 0:
-            raise ValueError("Os dias de contrato não podem ser negativos.")
-    except (KeyError, InvalidOperation, ValueError):
-        messages.error(request, "Informe um ramo, idade e valor válidos para a cotação.")
-        return render(request, "cotacoes/cotacao_form.html")
+        perfil, valor_estimado, valor_informado, descricao_bem = montar_perfil_cotacao(
+            request.POST, tipo_seguro
+        )
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return render(
+            request, "cotacoes/cotacao_form.html", {"form_data": request.POST}
+        )
 
-    dados_especificos = {}
-    if tipo_seguro == "auto":
-        dados_especificos = {"uso_veiculo": request.POST.get("uso_veiculo", "")}
-        valor_bem = float(valor_informado)
-    elif tipo_seguro == "vida":
-        valor_bem = float(valor_informado)
-        dados_especificos = {
-            "capital_segurado": valor_bem,
-            "dps_completa": request.POST.get("dps_completa") == "on",
-            "dps_compativel": request.POST.get("dps_compativel") == "on",
-            "tabagismo": request.POST.get("tabagismo") == "on",
-            "alcool_elevado": request.POST.get("alcool_elevado") == "on",
-            "doenca_relevante_declarada": request.POST.get("doenca_relevante_declarada") == "on",
-            "internacao_recente": request.POST.get("internacao_recente") == "on",
-            "profissao_risco": request.POST.get("profissao_risco") == "on",
-            "esporte_radical": request.POST.get("esporte_radical") == "on",
-        }
-    else:
-        valor_bem = float(valor_informado * 12)
-        dados_especificos = {
-            "operacao": "atendimento",
-            "segmentacao_contratada": request.POST.get("segmentacao_contratada", ""),
-            "tipo_atendimento": request.POST.get("tipo_atendimento", ""),
-            "dias_contrato": dias_contrato,
-            "cobertura_exigida": request.POST.get("cobertura_exigida", ""),
-            "no_rol_ans": request.POST.get("no_rol_ans") == "on",
-            "dentro_abrangencia": request.POST.get("dentro_abrangencia") == "on",
-            "dlp_declarada": request.POST.get("dlp_declarada") == "on",
-            "relacionado_dlp": request.POST.get("relacionado_dlp") == "on",
-            "alta_complexidade": request.POST.get("alta_complexidade") == "on",
-        }
+    valor_bem = perfil["valor_bem"]
 
     hoje = date.today()
     try:
-        data_nascimento_aproximada = hoje.replace(year=hoje.year - idade)
+        data_nascimento_aproximada = hoje.replace(year=hoje.year - perfil["idade"])
     except ValueError:
-        data_nascimento_aproximada = hoje.replace(year=hoje.year - idade, day=28)
+        data_nascimento_aproximada = hoje.replace(
+            year=hoje.year - perfil["idade"], day=28
+        )
 
     cliente, criado = Cliente.objects.get_or_create(
         cpf=cpf,
@@ -157,14 +245,17 @@ def nova_cotacao(request):
         if atualizou:
             cliente.save()
 
+    descricao_bem_registro = (
+        f"{cliente.nome} - {descricao_bem}"
+        if tipo_seguro == "auto"
+        else f"{cliente.nome} - {dict(Bem.TIPO_CHOICES).get(tipo_seguro, tipo_seguro)}"
+    )
     bem = Bem.objects.create(
         cliente=cliente,
         tipo=tipo_seguro,
-        descricao=f"{cliente.nome} - {dict(Bem.TIPO_CHOICES).get(tipo_seguro, tipo_seguro)}",
+        descricao=descricao_bem_registro[:200],
         valor_estimado=valor_estimado,
     )
-
-    perfil = {"idade": idade, "valor_bem": valor_bem, "tipo_seguro": tipo_seguro, **dados_especificos}
 
     # 1) IA Simbólica decide o parecer (RF04/RF05)
     parecer = motor_ia.avaliar_elegibilidade(perfil)
@@ -178,7 +269,7 @@ def nova_cotacao(request):
         cliente_id=cliente.id,
         bem_id=bem.id,
         tipo_seguro=tipo_seguro,
-        dados={**perfil, "uso_veiculo": uso_veiculo},
+        dados={**perfil, "valor_informado": float(valor_informado)},
         resultado_calculo=resultado_calculo,
         parecer_ia=parecer,
     )

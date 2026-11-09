@@ -20,7 +20,7 @@ Um sistema especialista tem 3 camadas separadas:
 O motor e MULTI-RAMO: existe uma base de regras para cada tipo de seguro
 operado pela corretora:
 
-    - auto  -> regras R-001 a R-010 (SUSEP)
+    - auto  -> regras R-001 a R-011 (regras internas de demonstração)
     - vida  -> regras V-001 a V-010 (SUSEP)
     - saude -> regras S-001 a S-010 (ANS)
 
@@ -46,7 +46,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Callable, Optional
 
-VERSAO_BASE_REGRAS = "2026.11"
+VERSAO_BASE_REGRAS = "2026.11.1"
 
 
 @dataclass
@@ -162,6 +162,12 @@ REGRAS_AUTO = [
           lambda f: {"experiencia": (
               "baixa" if f["tempo_habilitacao_anos"] < PA["habilitacao_minima_anos"] else "adequada")},
           0),
+    Regra("C-005", "auto", "Classifica a faixa etaria do condutor adicional",
+          lambda f: f.get("idade_condutor_adicional") is not None
+          and "condutor_adicional_jovem" not in f,
+          lambda f: {"condutor_adicional_jovem":
+                     f["idade_condutor_adicional"] < PA["idade_condutor_jovem"]},
+          0),
 
     # --- Parecer ---
     Regra("R-001", "auto", "Dados obrigatorios ausentes, invalidos ou contraditorios",
@@ -223,6 +229,11 @@ REGRAS_AUTO = [
           lambda f: _sem_parecer(f) and f.get("faixa_etaria") == "padrao" and f.get("faixa_valor") == "padrao",
           lambda f: _parecer("R-010", "Aprovada", "Perfil dentro dos parametros padrao de aceitacao."),
           10),
+    Regra("R-011", "auto", "Condutor adicional jovem informado na proposta",
+          lambda f: _sem_parecer(f) and f.get("condutor_adicional_jovem", False),
+          lambda f: _parecer("R-011", "Aprovada com Fator de Risco",
+                             "Condutor adicional com menos de 25 anos: sujeito a agravo tarifario."),
+          9),
 ]
 
 

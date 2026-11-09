@@ -7,7 +7,7 @@
     <div class="container">
         <p class="dashboard-eyebrow">Simulação</p>
         <h1 class="mb-1">Nova Cotação</h1>
-        <p class="text-muted mb-0">Preencha os dados do segurado e do bem para processar a triagem e o cálculo do prêmio.</p>
+        <p class="text-muted mb-0">Escolha o ramo e preencha os dados do segurado e do seguro para iniciar a análise.</p>
     </div>
 </section>
 
@@ -18,147 +18,200 @@
                 <form method="post" action="{% url 'nova_cotacao' %}">
                     {% csrf_token %}
 
-                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-person"></i> 1. Dados do Segurado</h6>
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-shield-check"></i> 1. Tipo de Seguro</h6>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-7">
-                            <label class="form-label small fw-semibold">Nome do Cliente</label>
-                            <input type="text" name="nome" class="form-control" placeholder="Ex: Cleverson Alves" required>
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label small fw-semibold">CPF</label>
-                            <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold">Idade do Condutor Principal</label>
-                            <input type="number" name="idade" class="form-control" placeholder="Ex: 26" min="0" max="120" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold">E-mail</label>
-                            <input type="email" name="email" class="form-control" placeholder="cliente@email.com">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold">Telefone</label>
-                            <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11">
+                        <div class="col-md-8">
+                            <label for="tipo-seguro" class="form-label small fw-semibold">Qual seguro deseja cotar?</label>
+                            <select name="tipo_seguro" id="tipo-seguro" class="form-select" required>
+                                <option value="" {% if not form_data.tipo_seguro %}selected{% endif %}>Selecione o tipo de seguro</option>
+                                <option value="auto" {% if form_data.tipo_seguro == "auto" %}selected{% endif %}>Automóvel</option>
+                                <option value="vida" {% if form_data.tipo_seguro == "vida" %}selected{% endif %}>Vida</option>
+                                <option value="saude" {% if form_data.tipo_seguro == "saude" %}selected{% endif %}>Saúde</option>
+                            </select>
+                            <span class="form-text">Os campos da cotação serão ajustados ao ramo escolhido.</span>
                         </div>
                     </div>
 
-                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-shield-check"></i> 2. Detalhes do Bem</h6>
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-person"></i> 2. Dados do Segurado</h6>
                     <div class="row g-3 mb-4">
+                        <div class="col-md-7">
+                            <label class="form-label small fw-semibold">Nome do Cliente</label>
+                            <input type="text" name="nome" class="form-control" placeholder="Ex: Cleverson Alves" value="{{ form_data.nome|default:'' }}" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold">CPF</label>
+                            <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" value="{{ form_data.cpf|default:'' }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="idade-segurado" id="idade-label" class="form-label small fw-semibold">Idade do segurado</label>
+                            <input type="number" name="idade" id="idade-segurado" class="form-control" placeholder="Ex: 35" min="0" max="120" value="{{ form_data.idade|default:'' }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">E-mail</label>
+                            <input type="email" name="email" class="form-control" placeholder="cliente@email.com" value="{{ form_data.email|default:'' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11" value="{{ form_data.telefone|default:'' }}">
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-clipboard-check"></i> 3. Dados da Cotação</h6>
+                    <div class="row g-3 mb-4" data-ramo="auto" hidden>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Tipo de Seguro</label>
-                            <select name="tipo_seguro" id="tipo-seguro" class="form-select" required>
-                                <option value="auto">Automóvel</option>
-                                <option value="vida">Vida</option>
-                                <option value="saude">Saúde</option>
+                            <label for="marca-veiculo" class="form-label small fw-semibold">Marca do veículo</label>
+                            <input type="text" name="marca_veiculo" id="marca-veiculo" class="form-control" placeholder="Ex.: Toyota" maxlength="80" value="{{ form_data.marca_veiculo|default:'' }}" data-obrigatorio>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="modelo-veiculo" class="form-label small fw-semibold">Modelo do veículo</label>
+                            <input type="text" name="modelo_veiculo" id="modelo-veiculo" class="form-control" placeholder="Ex.: Corolla XEi" maxlength="100" value="{{ form_data.modelo_veiculo|default:'' }}" data-obrigatorio>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Ano/modelo</label>
+                            <input type="number" name="ano_modelo" class="form-control" min="1900" max="2100" placeholder="Ex.: 2022" value="{{ form_data.ano_modelo|default:'' }}" data-obrigatorio>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Valor do veículo (R$)</label>
+                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex.: 85000" min="0.01" step="0.01" value="{% if form_data.tipo_seguro == 'auto' %}{{ form_data.valor_bem|default:'' }}{% endif %}" data-obrigatorio>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Uso principal</label>
+                            <select name="uso_veiculo" class="form-select" data-obrigatorio>
+                                <option value="passeio" {% if form_data.uso_veiculo == "passeio" or not form_data.uso_veiculo %}selected{% endif %}>Lazer / Passeio</option>
+                                <option value="trabalho" {% if form_data.uso_veiculo == "trabalho" %}selected{% endif %}>Trabalho / Aplicativo</option>
+                                <option value="carga" {% if form_data.uso_veiculo == "carga" %}selected{% endif %}>Comercial / Transporte de carga</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="valor-bem" id="valor-label" class="form-label small fw-semibold">Valor do Veículo (R$)</label>
-                            <input type="number" name="valor_bem" id="valor-bem" class="form-control" placeholder="Ex: 85000" min="0.01" step="0.01" required>
-                            <span id="valor-ajuda" class="form-text">Informe o valor estimado do veículo.</span>
+                            <label class="form-label small fw-semibold">Tempo de habilitação do condutor principal (anos)</label>
+                            <input type="number" name="tempo_habilitacao_anos" class="form-control" min="0" max="120" placeholder="Ex.: 8" value="{{ form_data.tempo_habilitacao_anos|default:'' }}" data-obrigatorio>
                         </div>
-                        <div class="col-md-6" data-ramo="auto">
-                            <label class="form-label small fw-semibold">Uso do Veículo</label>
-                            <select name="uso_veiculo" class="form-select">
-                                <option value="passeio">Lazer / Passeio</option>
-                                <option value="trabalho">Trabalho / Uber</option>
-                                <option value="carga">Comercial / Carga</option>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Sinistros nos últimos 3 anos</label>
+                            <select name="sinistros_ultimos_3_anos" class="form-select" data-obrigatorio>
+                                <option value="0" {% if form_data.sinistros_ultimos_3_anos == "0" or not form_data.sinistros_ultimos_3_anos %}selected{% endif %}>Nenhum</option>
+                                <option value="1" {% if form_data.sinistros_ultimos_3_anos == "1" %}selected{% endif %}>1 sinistro</option>
+                                <option value="2" {% if form_data.sinistros_ultimos_3_anos == "2" %}selected{% endif %}>2 sinistros</option>
+                                <option value="3" {% if form_data.sinistros_ultimos_3_anos == "3" %}selected{% endif %}>3 ou mais</option>
                             </select>
                         </div>
-                        <div class="col-12 row g-3" data-ramo="vida" hidden>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="checkbox" name="condutor_adicional" id="condutor-adicional" class="form-check-input" {% if form_data.condutor_adicional == "on" %}checked{% endif %}>
+                                <label for="condutor-adicional" class="form-check-label">Há outro condutor habitual?</label>
+                            </div>
+                            <div id="idade-condutor-adicional-wrapper" class="mt-2" hidden>
+                                <label class="form-label small fw-semibold">Idade do condutor adicional mais jovem</label>
+                                <input type="number" name="idade_condutor_adicional" id="idade-condutor-adicional" class="form-control" min="18" max="120" placeholder="Ex.: 22" value="{{ form_data.idade_condutor_adicional|default:'' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-4" data-ramo="vida" hidden>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Capital segurado desejado (R$)</label>
+                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex.: 300000" min="0.01" step="0.01" value="{% if form_data.tipo_seguro == 'vida' %}{{ form_data.valor_bem|default:'' }}{% endif %}" data-obrigatorio>
+                        </div>
+                        <div class="col-12 row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Declaração Pessoal de Saúde completa</label>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dps_completa" class="form-check-input" checked>
+                                    <input type="checkbox" name="dps_completa" class="form-check-input" {% if not form_data or form_data.dps_completa == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Sim, dados declarados para esta simulação</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dps_compativel" class="form-check-input" checked>
+                                    <input type="checkbox" name="dps_compativel" class="form-check-input" {% if not form_data or form_data.dps_compativel == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Informações compatíveis com a proposta</label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Condições declaradas (se aplicável)</label>
                                 <div class="form-check">
-                                    <input type="checkbox" name="doenca_relevante_declarada" class="form-check-input">
+                                    <input type="checkbox" name="doenca_relevante_declarada" class="form-check-input" {% if form_data.doenca_relevante_declarada == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Doença relevante declarada</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="internacao_recente" class="form-check-input">
+                                    <input type="checkbox" name="internacao_recente" class="form-check-input" {% if form_data.internacao_recente == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Internação recente</label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Hábitos ou atividade de risco (se aplicável)</label>
                                 <div class="form-check">
-                                    <input type="checkbox" name="tabagismo" class="form-check-input">
+                                    <input type="checkbox" name="tabagismo" class="form-check-input" {% if form_data.tabagismo == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Tabagismo</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="alcool_elevado" class="form-check-input">
+                                    <input type="checkbox" name="alcool_elevado" class="form-check-input" {% if form_data.alcool_elevado == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Consumo elevado de álcool</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="profissao_risco" class="form-check-input">
+                                    <input type="checkbox" name="profissao_risco" class="form-check-input" {% if form_data.profissao_risco == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Profissão de alto risco</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="esporte_radical" class="form-check-input">
+                                    <input type="checkbox" name="esporte_radical" class="form-check-input" {% if form_data.esporte_radical == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Prática de esporte radical</label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 row g-3" data-ramo="saude" hidden>
+                    </div>
+                    <div class="row g-3 mb-4" data-ramo="saude" hidden>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Mensalidade estimada do plano (R$)</label>
+                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex.: 850" min="0.01" step="0.01" value="{% if form_data.tipo_seguro == 'saude' %}{{ form_data.valor_bem|default:'' }}{% endif %}" data-obrigatorio>
+                            <span class="form-text">Informe o valor mensal para estimar a mensalidade anualizada.</span>
+                        </div>
+                        <div class="col-12 row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Segmentação contratada</label>
                                 <select name="segmentacao_contratada" class="form-select" data-obrigatorio>
-                                    <option value="ambulatorial">Ambulatorial</option>
-                                    <option value="hospitalar">Hospitalar</option>
-                                    <option value="hospitalar_obstetricia">Hospitalar com obstetrícia</option>
-                                    <option value="referencia">Referência</option>
+                                    <option value="ambulatorial" {% if form_data.segmentacao_contratada == "ambulatorial" or not form_data.segmentacao_contratada %}selected{% endif %}>Ambulatorial</option>
+                                    <option value="hospitalar" {% if form_data.segmentacao_contratada == "hospitalar" %}selected{% endif %}>Hospitalar</option>
+                                    <option value="hospitalar_obstetricia" {% if form_data.segmentacao_contratada == "hospitalar_obstetricia" %}selected{% endif %}>Hospitalar com obstetrícia</option>
+                                    <option value="referencia" {% if form_data.segmentacao_contratada == "referencia" %}selected{% endif %}>Referência</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Tipo de atendimento</label>
                                 <select name="tipo_atendimento" class="form-select" data-obrigatorio>
-                                    <option value="demais">Demais procedimentos</option>
-                                    <option value="urgencia_emergencia">Urgência / emergência</option>
-                                    <option value="parto">Parto</option>
+                                    <option value="demais" {% if form_data.tipo_atendimento == "demais" or not form_data.tipo_atendimento %}selected{% endif %}>Demais procedimentos</option>
+                                    <option value="urgencia_emergencia" {% if form_data.tipo_atendimento == "urgencia_emergencia" %}selected{% endif %}>Urgência / emergência</option>
+                                    <option value="parto" {% if form_data.tipo_atendimento == "parto" %}selected{% endif %}>Parto</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Dias desde o início do contrato</label>
-                                <input type="number" name="dias_contrato" class="form-control" min="0" value="365" data-obrigatorio>
+                                <input type="number" name="dias_contrato" class="form-control" min="0" value="{{ form_data.dias_contrato|default:'365' }}" data-obrigatorio>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Cobertura exigida</label>
                                 <select name="cobertura_exigida" class="form-select">
-                                    <option value="ambulatorial">Ambulatorial</option>
-                                    <option value="hospitalar">Hospitalar</option>
-                                    <option value="obstetricia">Obstetrícia</option>
+                                    <option value="ambulatorial" {% if form_data.cobertura_exigida == "ambulatorial" or not form_data.cobertura_exigida %}selected{% endif %}>Ambulatorial</option>
+                                    <option value="hospitalar" {% if form_data.cobertura_exigida == "hospitalar" %}selected{% endif %}>Hospitalar</option>
+                                    <option value="obstetricia" {% if form_data.cobertura_exigida == "obstetricia" %}selected{% endif %}>Obstetrícia</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-check">
-                                    <input type="checkbox" name="no_rol_ans" class="form-check-input" checked>
+                                    <input type="checkbox" name="no_rol_ans" class="form-check-input" {% if not form_data or form_data.no_rol_ans == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Procedimento previsto no Rol da ANS</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dentro_abrangencia" class="form-check-input" checked>
+                                    <input type="checkbox" name="dentro_abrangencia" class="form-check-input" {% if not form_data or form_data.dentro_abrangencia == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Atendimento dentro da abrangência</label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-check">
-                                    <input type="checkbox" name="dlp_declarada" class="form-check-input">
+                                    <input type="checkbox" name="dlp_declarada" class="form-check-input" {% if form_data.dlp_declarada == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Doença ou lesão preexistente declarada</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="relacionado_dlp" class="form-check-input">
+                                    <input type="checkbox" name="relacionado_dlp" class="form-check-input" {% if form_data.relacionado_dlp == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Procedimento relacionado à declaração</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="alta_complexidade" class="form-check-input">
+                                    <input type="checkbox" name="alta_complexidade" class="form-check-input" {% if form_data.alta_complexidade == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Procedimento de alta complexidade</label>
                                 </div>
                             </div>
@@ -178,19 +231,19 @@
 {% block extra_scripts %}
 <script>
     const tipoSeguro = document.getElementById("tipo-seguro");
-    const valorLabel = document.getElementById("valor-label");
-    const valorAjuda = document.getElementById("valor-ajuda");
+    const idadeLabel = document.getElementById("idade-label");
+    const condutorAdicional = document.getElementById("condutor-adicional");
+    const idadeAdicionalWrapper = document.getElementById("idade-condutor-adicional-wrapper");
+    const idadeAdicional = document.getElementById("idade-condutor-adicional");
     const configuracoes = {
-        auto: ["Valor do Veículo (R$)", "Informe o valor estimado do veículo."],
-        vida: ["Capital Segurado (R$)", "Informe o capital solicitado para a cobertura de vida."],
-        saude: ["Mensalidade estimada (R$)", "Informe o valor mensal informado pela operadora."]
+        auto: "Idade do condutor principal",
+        vida: "Idade da pessoa segurada",
+        saude: "Idade do beneficiário principal"
     };
 
     function atualizarCamposPorRamo() {
         const ramo = tipoSeguro.value;
-        const [rotulo, ajuda] = configuracoes[ramo];
-        valorLabel.textContent = rotulo;
-        valorAjuda.textContent = ajuda;
+        idadeLabel.textContent = configuracoes[ramo] || "Idade do segurado";
 
         document.querySelectorAll("[data-ramo]").forEach((grupo) => {
             const ativo = grupo.dataset.ramo === ramo;
@@ -200,9 +253,18 @@
                 campo.required = ativo && campo.hasAttribute("data-obrigatorio");
             });
         });
+        atualizarCondutorAdicional();
+    }
+
+    function atualizarCondutorAdicional() {
+        const ativo = tipoSeguro.value === "auto" && condutorAdicional.checked;
+        idadeAdicionalWrapper.hidden = !ativo;
+        idadeAdicional.disabled = !ativo;
+        idadeAdicional.required = ativo;
     }
 
     tipoSeguro.addEventListener("change", atualizarCamposPorRamo);
+    condutorAdicional.addEventListener("change", atualizarCondutorAdicional);
     atualizarCamposPorRamo();
 </script>
 {% endblock %}

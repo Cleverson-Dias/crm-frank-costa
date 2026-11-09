@@ -8,6 +8,82 @@ from django.test import SimpleTestCase
 from .analytics import calcular_taxa_retencao, gerar_comissoes_demonstracao
 from .motor_ia import avaliar_elegibilidade, calcular_proposta
 from .models import RenovacaoApolice
+from .views import montar_perfil_cotacao
+
+
+class FormularioCotacaoTests(SimpleTestCase):
+    def test_auto_profile_captures_vehicle_and_driver_data(self):
+        perfil, valor_estimado, _, descricao = montar_perfil_cotacao(
+            {
+                "idade": "35",
+                "valor_bem": "85000",
+                "marca_veiculo": "Toyota",
+                "modelo_veiculo": "Corolla XEi",
+                "ano_modelo": "2022",
+                "uso_veiculo": "trabalho",
+                "tempo_habilitacao_anos": "10",
+                "sinistros_ultimos_3_anos": "1",
+                "condutor_adicional": "on",
+                "idade_condutor_adicional": "22",
+            },
+            "auto",
+            ano_atual=2026,
+        )
+
+        self.assertEqual(valor_estimado, Decimal("85000"))
+        self.assertEqual(descricao, "Toyota Corolla XEi - 2022")
+        self.assertEqual(perfil["marca_veiculo"], "Toyota")
+        self.assertEqual(perfil["ano_modelo"], 2022)
+        self.assertTrue(perfil["uso_profissional"])
+        self.assertEqual(perfil["idade_condutor_adicional"], 22)
+
+    def test_life_profile_does_not_include_vehicle_fields(self):
+        perfil, valor_estimado, _, _ = montar_perfil_cotacao(
+            {"idade": "35", "valor_bem": "300000", "dps_completa": "on"},
+            "vida",
+            ano_atual=2026,
+        )
+
+        self.assertEqual(valor_estimado, Decimal("300000"))
+        self.assertEqual(perfil["capital_segurado"], 300000)
+        self.assertNotIn("marca_veiculo", perfil)
+        self.assertNotIn("uso_veiculo", perfil)
+
+    def test_health_profile_annualizes_monthly_premium_without_vehicle_fields(self):
+        perfil, valor_estimado, valor_mensal, _ = montar_perfil_cotacao(
+            {
+                "idade": "35",
+                "valor_bem": "850",
+                "segmentacao_contratada": "referencia",
+                "tipo_atendimento": "demais",
+                "cobertura_exigida": "ambulatorial",
+                "dias_contrato": "120",
+            },
+            "saude",
+            ano_atual=2026,
+        )
+
+        self.assertEqual(valor_mensal, Decimal("850"))
+        self.assertEqual(valor_estimado, Decimal("10200"))
+        self.assertEqual(perfil["valor_bem"], 10200)
+        self.assertNotIn("marca_veiculo", perfil)
+
+    def test_auto_requires_vehicle_identification(self):
+        with self.assertRaisesMessage(ValueError, "Informe a marca e o modelo do veículo."):
+            montar_perfil_cotacao(
+                {
+                    "idade": "35",
+                    "valor_bem": "85000",
+                    "marca_veiculo": "",
+                    "modelo_veiculo": "Corolla",
+                    "ano_modelo": "2022",
+                    "uso_veiculo": "passeio",
+                    "tempo_habilitacao_anos": "10",
+                    "sinistros_ultimos_3_anos": "0",
+                },
+                "auto",
+                ano_atual=2026,
+            )
 
 
 class MotorPorRamoTests(SimpleTestCase):
@@ -19,6 +95,17 @@ class MotorPorRamoTests(SimpleTestCase):
 
         self.assertEqual(parecer["status"], "Aprovada")
         self.assertEqual(proposta["premio"], 3600.0)
+
+    def test_auto_additional_young_driver_receives_risk_factor(self):
+        parecer = avaliar_elegibilidade({
+            "tipo_seguro": "auto",
+            "idade": 35,
+            "valor_bem": 80_000,
+            "idade_condutor_adicional": 22,
+        })
+
+        self.assertEqual(parecer["status"], "Aprovada com Fator de Risco")
+        self.assertEqual(parecer["regra_id"], "R-011")
 
     def test_life_uses_capital_segurado_rules_and_rate(self):
         perfil = {
