@@ -20,7 +20,7 @@ TIPOS_SEGURO_ATIVOS = [
 ]
 
 TIPOS_SEGURO_LEGADOS = [
-    ("residencial", "Residencial (histórico)"),
+    ("residencial", "Residencial"),
 ]
 
 
@@ -219,3 +219,35 @@ class RenovacaoApolice(models.Model):
 
     def __str__(self):
         return f"Renovação de {self.apolice.numero_apolice} ({self.get_status_display()})"
+
+
+class ComissaoMensalDemonstracao(models.Model):
+    """Cenário acadêmico de comissões mensais fictícias para o painel."""
+
+    mes_referencia = models.DateField()
+    tipo_seguro = models.CharField(max_length=20, choices=TIPOS_SEGURO_ATIVOS)
+    comissao_bruta = models.DecimalField(max_digits=12, decimal_places=2)
+    percentual_liquido_estimado = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=75,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["mes_referencia", "tipo_seguro"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mes_referencia", "tipo_seguro"],
+                name="uq_comissao_demo_mes_ramo",
+            ),
+        ]
+        verbose_name = "Comissão mensal demonstrativa"
+        verbose_name_plural = "Comissões mensais demonstrativas"
+
+    @property
+    def comissao_liquida_estimada(self):
+        return self.comissao_bruta * self.percentual_liquido_estimado / 100
+
+    def __str__(self):
+        return f"{self.mes_referencia:%m/%Y} - {self.get_tipo_seguro_display()}"

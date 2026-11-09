@@ -1,7 +1,11 @@
+from collections import defaultdict
+from datetime import date
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
-from .analytics import calcular_taxa_retencao
+from .analytics import calcular_taxa_retencao, gerar_comissoes_demonstracao
 from .motor_ia import avaliar_elegibilidade, calcular_proposta
 from .models import RenovacaoApolice
 
@@ -56,6 +60,39 @@ class TaxaRetencaoTests(SimpleTestCase):
     def test_retention_rejects_impossible_counts(self):
         with self.assertRaises(ValueError):
             calcular_taxa_retencao(3, 2)
+
+
+class ComissoesDemonstracaoTests(SimpleTestCase):
+    def test_generates_three_branches_for_each_of_the_last_24_months(self):
+        linhas = gerar_comissoes_demonstracao(date(2026, 11, 9))
+        valores_por_mes = defaultdict(Decimal)
+        ramos_por_mes = defaultdict(set)
+
+        for mes, ramo, valor in linhas:
+            valores_por_mes[mes] += valor
+            ramos_por_mes[mes].add(ramo)
+
+        self.assertEqual(len(linhas), 24 * 3)
+        self.assertEqual(len(valores_por_mes), 24)
+        self.assertEqual(min(valores_por_mes), date(2024, 12, 1))
+        self.assertEqual(max(valores_por_mes), date(2026, 11, 1))
+        for mes, total in valores_por_mes.items():
+            with self.subTest(mes=mes):
+                self.assertGreaterEqual(total, Decimal("6000"))
+                self.assertLessEqual(total, Decimal("12000"))
+                self.assertEqual(ramos_por_mes[mes], {"auto", "vida", "saude"})
+
+    def test_monthly_values_are_repeatable(self):
+        referencia = date(2026, 11, 9)
+
+        self.assertEqual(
+            gerar_comissoes_demonstracao(referencia),
+            gerar_comissoes_demonstracao(referencia),
+        )
+
+    def test_rejects_non_positive_month_count(self):
+        with self.assertRaises(ValueError):
+            gerar_comissoes_demonstracao(date(2026, 11, 9), 0)
 
 
 class RenovacaoApoliceTests(SimpleTestCase):

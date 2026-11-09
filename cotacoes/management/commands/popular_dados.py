@@ -1,5 +1,6 @@
 import random
-from datetime import date, timedelta
+from calendar import monthrange
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pandas as pd
@@ -7,10 +8,12 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from cotacoes import motor_ia, nosql
+from cotacoes.analytics import deslocar_mes, gerar_comissoes_demonstracao
 from cotacoes.models import (
     Apolice,
     Bem,
     Cliente,
+    ComissaoMensalDemonstracao,
     Plano,
     RenovacaoApolice,
     Seguradora,
@@ -36,6 +39,7 @@ SOBRENOMES = [
 DISTRIBUICAO_ATIVOS = {"auto": 30, "vida": 10, "saude": 10}
 COMISSAO_ANUAL_POR_RAMO = {"auto": 500.00, "vida": 2500.00, "saude": 5600.00}
 COTACOES_ADICIONAIS = 50
+MESES_HISTORICO = 24
 
 
 def cpf_fake(usados):
@@ -47,7 +51,10 @@ def cpf_fake(usados):
 
 
 class Command(BaseCommand):
-    help = "Gera 50 clientes, 50 apólices ativas e histórico sintético de cotações e renovações."
+    help = (
+        "Gera uma base demonstrativa com 50 clientes, 50 apólices, "
+        "24 meses de cotações, comissões e renovações."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -74,8 +81,8 @@ class Command(BaseCommand):
         registros_cotacoes = []
         apolices_ativas_criadas = 0
 
-        for ramo in ramos_ativos:
-            hoje = date.today()
+        hoje = date.today()
+        for indice, ramo in enumerate(ramos_ativos):
             nome = f"{random.choice(NOMES)} {random.choice(SOBRENOMES)}"
             idade = random.randint(25, 65)
             try:
@@ -112,6 +119,7 @@ class Command(BaseCommand):
                     dados={**perfil, "origem_dados": "demonstracao_sintetica"},
                     resultado_calculo=resultado,
                     parecer_ia=parecer,
+                    criado_em=self._data_cotacao(indice, len(ramos_ativos), hoje),
                 )
                 apolice = self._criar_apolice(
                     cliente, bem, plano, cotacao_id, resultado, hoje
@@ -151,16 +159,25 @@ class Command(BaseCommand):
                     dados={**perfil, "origem_dados": "demonstracao_sintetica"},
                     resultado_calculo=resultado,
                     parecer_ia=parecer,
+                    criado_em=self._data_cotacao(
+                        len(ramos_ativos) + indice,
+                        len(ramos_ativos) + COTACOES_ADICIONAIS,
+                        hoje,
+                    ),
                 )
                 registros_cotacoes.append(self._registro_higienizacao(
                     cliente, ramo, perfil, parecer, resultado
                 ))
 
         renovacoes_criadas = self._criar_historico_renovacoes(clientes_e_apolices)
+        comissoes_criadas = self._criar_comissoes_mensais()
         self._demonstrar_higienizacao_rf07(registros_cotacoes)
 
         comissao_anual = sum(
-            Apolice.objects.filter(status="ativa").values_list("valor_comissao", flat=True)
+            Apolice.objects.filter(
+                status="ativa",
+                cliente__dados_sinteticos=True,
+            ).values_list("valor_comissao", flat=True)
         )
         self.stdout.write(self.style.SUCCESS(
             "\nBase demonstrativa sintética concluída.\n"
@@ -168,6 +185,8 @@ class Command(BaseCommand):
             f"  Apólices ativas criadas:       {apolices_ativas_criadas}\n"
             f"  Cotações criadas:              {len(registros_cotacoes)}\n"
             f"  Histórico de renovações:       {renovacoes_criadas}\n"
+            f"  Valores mensais demonstrativos:{comissoes_criadas:>7}\n"
+            f"  Período coberto:                {MESES_HISTORICO} meses\n"
             f"  Comissão anual da carteira:    R$ {comissao_anual:,.2f}\n"
         ))
 
@@ -260,23 +279,23 @@ class Command(BaseCommand):
     def _criar_historico_renovacoes(self, clientes_e_apolices):
         hoje = date.today()
         renovacoes_criadas = 0
-        for indice, (cliente, apolice_atual, ramo_atual) in enumerate(clientes_e_apolices[:25]):
-            data_vencimento = hoje - timedelta(days=30 + indice * 12)
-            renovada = indice < 20
-            ramo_anterior = ramo_atual if renovada else next(
-                ramo for ramo, _ in TIPOS_SEGURO_ATIVOS if ramo != ramo_atual
+        total_renovacoes = MESES_HISTORICO * 2
+        for indice in range(total_renovacoes):
+            cliente, apolice_atual, ramo_atual = clientes_e_apolices[indice]
+            mes_indice = indice // 2
+            mes_referencia = deslocar_mes(
+                date(hoje.year, hoje.month, 1),
+                -(MESES_HISTORICO - 1 - mes_indice),
             )
-            plano_anterior = self._plano_ativo(ramo_anterior)
-            bem_anterior = apolice_atual.bem if renovada else Bem.objects.create(
-                cliente=cliente,
-                tipo=ramo_anterior,
-                descricao=self._descricao_bem(cliente.nome, ramo_anterior),
-                valor_estimado=apolice_atual.valor_premio,
-                ativo=False,
-            )
+            dia = min(5 + (indice % 2) * 12, monthrange(
+                mes_referencia.year, mes_referencia.month
+            )[1])
+            data_vencimento = mes_referencia.replace(day=dia)
+            renovada = indice % 4 != 0
+            plano_anterior = self._plano_ativo(ramo_atual)
             apolice_anterior = Apolice.objects.create(
                 cliente=cliente,
-                bem=bem_anterior,
+                bem=apolice_atual.bem,
                 seguradora=plano_anterior.seguradora,
                 plano=plano_anterior,
                 numero_apolice=self._numero_apolice_unico(data_vencimento.year),
@@ -291,15 +310,36 @@ class Command(BaseCommand):
                 apolice=apolice_anterior,
                 apolice_renovada=apolice_atual if renovada else None,
                 data_vencimento=data_vencimento,
-                data_decisao=data_vencimento + timedelta(days=1),
+                data_decisao=min(data_vencimento + timedelta(days=1), hoje),
                 status="renovada" if renovada else "nao_renovada",
             )
-            if renovada:
-                apolice_atual.data_inicio = data_vencimento + timedelta(days=1)
-                apolice_atual.data_fim = apolice_atual.data_inicio + timedelta(days=365)
-                apolice_atual.save(update_fields=["data_inicio", "data_fim"])
             renovacoes_criadas += 1
         return renovacoes_criadas
+
+    def _criar_comissoes_mensais(self):
+        linhas = gerar_comissoes_demonstracao(date.today(), MESES_HISTORICO)
+        for mes, ramo, valor in linhas:
+            ComissaoMensalDemonstracao.objects.update_or_create(
+                mes_referencia=mes,
+                tipo_seguro=ramo,
+                defaults={
+                    "comissao_bruta": valor,
+                    "percentual_liquido_estimado": Decimal("75.00"),
+                },
+            )
+        return len(linhas)
+
+    def _data_cotacao(self, indice, total, hoje):
+        mes_atual = date(hoje.year, hoje.month, 1)
+        deslocamento = -(MESES_HISTORICO - 1) + (indice % MESES_HISTORICO)
+        mes = deslocar_mes(mes_atual, deslocamento)
+        dias_no_mes = monthrange(mes.year, mes.month)[1]
+        dia = 1 + ((indice * 7 + total) % dias_no_mes)
+        return datetime.combine(
+            mes.replace(day=dia),
+            time(hour=12 + indice % 8),
+            tzinfo=timezone.utc,
+        )
 
     def _plano_ativo(self, ramo):
         planos = list(Plano.objects.filter(
@@ -340,6 +380,7 @@ class Command(BaseCommand):
             {"dados.origem_dados": "demonstracao_sintetica"}
         )
         self.stdout.write(f"  MongoDB: {resultado.deleted_count} cotações removidas.")
+        comissoes_removidas, _ = ComissaoMensalDemonstracao.objects.all().delete()
         clientes_sinteticos = Cliente.objects.filter(dados_sinteticos=True)
         ids_clientes = list(clientes_sinteticos.values_list("id", flat=True))
         qtd_clientes = len(ids_clientes)
@@ -347,6 +388,7 @@ class Command(BaseCommand):
         clientes_sinteticos.delete()
         self.stdout.write(
             f"  PostgreSQL: apólices e {qtd_clientes} clientes sintéticos removidos; "
+            f"{comissoes_removidas} valores mensais demonstrativos removidos; "
             "dados não identificados como sintéticos, seguradoras e planos foram mantidos.\n"
         )
 

@@ -9,7 +9,15 @@ desenvolvimento no fluxo principal do CRM (cotação → cliente).
 """
 
 from django.contrib import admin
-from .models import Cliente, Bem, Seguradora, Plano, Apolice, RenovacaoApolice
+from .models import (
+    Apolice,
+    Bem,
+    Cliente,
+    ComissaoMensalDemonstracao,
+    Plano,
+    RenovacaoApolice,
+    Seguradora,
+)
 
 
 @admin.register(Cliente)
@@ -54,3 +62,10 @@ class RenovacaoApoliceAdmin(admin.ModelAdmin):
     list_filter = ("status", "data_vencimento")
     search_fields = ("apolice__numero_apolice", "apolice__cliente__nome")
     date_hierarchy = "data_vencimento"
+
+
+@admin.register(ComissaoMensalDemonstracao)
+class ComissaoMensalDemonstracaoAdmin(admin.ModelAdmin):
+    list_display = ("mes_referencia", "tipo_seguro", "comissao_bruta", "percentual_liquido_estimado")
+    list_filter = ("tipo_seguro", "mes_referencia")
+    date_hierarchy = "mes_referencia"

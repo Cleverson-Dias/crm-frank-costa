@@ -37,7 +37,15 @@ def get_db():
     return _client[settings.MONGO_DB_NAME]
 
 
-def salvar_cotacao(cliente_id, bem_id, tipo_seguro, dados, resultado_calculo, parecer_ia):
+def salvar_cotacao(
+    cliente_id,
+    bem_id,
+    tipo_seguro,
+    dados,
+    resultado_calculo,
+    parecer_ia,
+    criado_em=None,
+):
     """Persiste uma cotação completa (dados + cálculo + parecer da IA)."""
     db = get_db()
     documento = {
@@ -47,7 +55,7 @@ def salvar_cotacao(cliente_id, bem_id, tipo_seguro, dados, resultado_calculo, pa
         "dados": dados,
         "resultado_calculo": resultado_calculo,
         "parecer_ia": parecer_ia,
-        "criado_em": datetime.now(timezone.utc),
+        "criado_em": criado_em or datetime.now(timezone.utc),
     }
     resultado = db.cotacoes.insert_one(documento)
     return str(resultado.inserted_id)

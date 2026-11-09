@@ -31,9 +31,19 @@ Cada decisão carrega uma **trilha de inferência** — qual regra disparou, em 
 - **Gestão de Clientes** — cadastro, consulta e inativação de clientes e seus bens ou referências seguradas (automóvel, vida, saúde)
 - **Cotação com IA Simbólica** — simulação por ramo, parecer explicável e estimativa de prêmio; a comissão efetiva é calculada a partir do plano escolhido
 - **Fechamento de negócio** — converte uma cotação aprovada em apólice real, vinculada a uma seguradora parceira e a um plano específico, com cálculo de comissão
-- **Dashboard gerencial** — indicadores de cotações, conversão, apólices ativas, comissões anualizadas e renovações
+- **Dashboard gerencial** — indicadores e análises interativas de cotações, conversão, carteira, comissões e renovações
 - **Back-office via Django Admin** — gestão de seguradoras, planos, apólices e histórico de renovações, restrita a usuários staff
 - **Autenticação** — todas as telas operacionais exigem login
+
+---
+
+## Painel gerencial Streamlit
+
+O painel `app_analytics.py` integra as cotações do MongoDB e os dados da carteira no PostgreSQL. Os filtros de ramo afetam as cotações e a carteira vigente; período e parecer afetam a análise de cotações, enquanto o período também seleciona receitas demonstrativas e decisões de renovação. A opção **Incluir dados fictícios da demonstração** controla os dados sintéticos identificados pelo projeto.
+
+A tela apresenta comissão bruta demonstrativa mês a mês, tendências de cotações, distribuição de pareceres, conversão, comissões por ramo e seguradora, tabelas pesquisáveis de apólices e renovações e exportação CSV das cotações filtradas. As tabelas exibem até 100 registros; a exportação inclui todos os resultados encontrados. Os dados são atualizados automaticamente a cada minuto ou pelo botão **Atualizar**, que preserva os filtros selecionados.
+
+O painel separa a comissão anual registrada nas apólices ativas do cenário de comissão bruta mensal fictícia. O cenário mensal cobre 24 meses e totaliza entre R$ 6 mil e R$ 12 mil por mês quando os três ramos são selecionados. O líquido médio é uma estimativa com margem acadêmica de 75%; nenhum desses valores representa caixa ou resultado contábil real.
 
 ---
 
@@ -135,13 +145,13 @@ Acesse `http://127.0.0.1:8000/` e o painel Streamlit em `http://localhost:8501/`
 
 ## Dados de demonstração
 
-O comando `popular_dados` gera, a cada execução, 50 clientes, 50 apólices ativas e 50 cotações adicionais não fechadas. O mix ativo é uma premissa sintética de demonstração: 30 apólices de automóvel, 10 de vida e 10 de saúde. Também cria 25 tentativas de renovação com 20 resultados positivos, para demonstrar a métrica de retenção em 12 meses.
+O comando `popular_dados` gera, a cada execução, 50 clientes, 50 apólices ativas e 50 cotações adicionais não fechadas. O mix ativo é uma premissa sintética de demonstração: 30 apólices de automóvel, 10 de vida e 10 de saúde. Também cria 48 decisões de renovação distribuídas pelos últimos 24 meses e valores mensais demonstrativos para automóvel, vida e saúde ao longo do mesmo período.
 
-As comissões da carteira são estimadas a partir do percentual cadastrado nos planos. O cenário usa como referência acadêmica R$ 96 mil de comissão anual e uma margem líquida estimada de 75% (R$ 72 mil/ano ou R$ 6 mil/mês); não são dados contábeis nem percentuais reais garantidos pelas seguradoras. O painel identifica os registros gerados como sintéticos.
+As comissões da carteira são calculadas a partir do percentual cadastrado nos planos. Separadamente, o cenário demonstrativo gera de R$ 6 mil a R$ 12 mil de comissão bruta mensal, com margem líquida acadêmica estimada em 75%. São valores fictícios e não representam dados contábeis nem percentuais reais garantidos pelas seguradoras. A tabela de comissão mensal requer a migração do modelo demonstrativo.
 
 O gerador não reproduz mais a tabela estatística antiga de 50 cotações exclusivamente de automóvel: a seção 8 do relatório e os slides devem ser revisados separadamente para refletir o novo mix, pois os arquivos-fonte desses documentos não fazem parte deste repositório.
 
-A opção `--limpar` remove apenas clientes e cotações marcados como sintéticos pelo gerador atual; registros sem essa marcação são preservados.
+A opção `--limpar` remove clientes e apólices identificados como sintéticos, as cotações marcadas como demonstração e a série de comissões demonstrativas; registros sem essa identificação são preservados. Antes de usá-la em uma base que já contenha dados, confirme que somente os registros demonstrativos desejados estão marcados.
 
 ```bash
 python manage.py popular_dados --limpar
