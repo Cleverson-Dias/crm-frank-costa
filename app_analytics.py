@@ -249,12 +249,12 @@ def carregar_dados_relacionais(ramos, data_inicio, data_fim, incluir_demonstraca
     )
     comissoes_por_ramo = list(
         apolices_ativas_qs.values("bem__tipo")
-        .annotate(total=Sum("valor_comissao"))
+        .annotate(total=Sum("valor_comissao", default=0))
         .order_by("bem__tipo")
     )
     comissoes_por_seguradora = list(
         apolices_ativas_qs.values("seguradora__nome")
-        .annotate(total=Sum("valor_comissao"))
+        .annotate(total=Sum("valor_comissao", default=0))
         .order_by("-total")
     )
     clientes_na_carteira = (
@@ -592,7 +592,10 @@ except DatabaseError:
     st.stop()
 
 apolices = dados_relacionais["apolices_ativas"]
-comissao_anual = sum(float(apolice["valor_comissao"]) for apolice in apolices)
+comissao_anual = sum(
+    float(apolice["valor_comissao"] or 0)
+    for apolice in apolices
+)
 df_receitas = pd.DataFrame(dados_relacionais["comissoes_mensais"])
 receita_media_mensal = None
 liquido_medio_mensal = None

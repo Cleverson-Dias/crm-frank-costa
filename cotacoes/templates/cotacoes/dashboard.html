@@ -70,15 +70,15 @@
                     <tr>
                         <td>{{ c.cliente_nome }}</td>
                         <td>{{ c.tipo_seguro }}</td>
-                        <td>R$ {{ c.valor_bem|floatformat:2 }}</td>
+                        <td>{% if c.valor_bem != None %}R$ {{ c.valor_bem|floatformat:2 }}{% else %}—{% endif %}</td>
                         <td>
                             <span class="status-badge status-{{ c.status_ia|slugify }}">{{ c.status_ia }}</span>
                         </td>
-                        <td class="text-end">R$ {{ c.premio|floatformat:2 }}</td>
+                        <td class="text-end">{% if c.premio != None %}R$ {{ c.premio|floatformat:2 }}{% else %}—{% endif %}</td>
                         <td class="text-end">
                             {% if c.fechada %}
                                 <span class="status-badge status-aprovada">Fechada</span>
-                            {% elif c.status_ia != "Recusada" %}
+                            {% elif c.pode_fechar %}
                                 <a href="{% url 'fechar_negocio' cotacao_id=c.cotacao_id %}" class="btn btn-outline-custom btn-sm">Fechar Negócio</a>
                             {% else %}
                                 <span class="text-muted">—</span>

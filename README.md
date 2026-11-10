@@ -30,12 +30,14 @@ Os campos de automóvel consideram informações usuais para cotação, como mar
 
 ## Funcionalidades
 
-- **Gestão de Clientes** — cadastro, consulta e inativação de clientes e seus bens ou referências seguradas (automóvel, vida, saúde)
-- **Nova cotação por ramo** — primeiro seleciona automóvel, vida ou saúde; em seguida, o formulário mostra os campos pertinentes, como veículo e perfil do condutor para automóvel, capital e declarações para vida, ou mensalidade e cobertura para saúde
-- **Cotação com IA Simbólica** — simulação por ramo, parecer explicável e estimativa de prêmio; a comissão efetiva é calculada a partir do plano escolhido
-- **Fechamento de negócio** — converte uma cotação aprovada em apólice real, vinculada a uma seguradora parceira e a um plano específico, com cálculo de comissão
+- **Gestão de Clientes** — cadastro de pessoas físicas e jurídicas, contatos, endereço, profissão e corretor responsável
+- **Catálogo comercial** — tipos de seguro configuráveis e planos ligados a seguradoras, com comissão e atributos de produto opcionais
+- **Nova cotação por ramo** — pessoa física pode usar a análise automática de automóvel, vida e saúde; pessoa jurídica gera uma cotação manual sem prêmio calculado
+- **Planos de saúde empresariais** — catálogo inicial de produtos SulAmérica e Bradesco Saúde informado pelo usuário, sem preço, CNPJ ou comissão presumidos; Bradesco exige mais de uma vida
+- **Cotação com IA Simbólica** — simulação por ramo, parecer explicável e estimativa de prêmio; a comissão só é calculada quando existe percentual cadastrado
+- **Gestão da carteira** — cotações relacionais vinculadas às simulações do MongoDB, apólices, renovações, sinistros e recebimentos de comissão
 - **Dashboard gerencial** — indicadores e análises interativas de cotações, conversão, carteira, comissões e renovações
-- **Back-office via Django Admin** — gestão de seguradoras, planos, apólices e histórico de renovações, restrita a usuários staff
+- **Back-office via Django Admin** — gestão de clientes, catálogo, cotações, apólices, sinistros, renovações e recebimentos, restrita a usuários staff
 - **Autenticação** — todas as telas operacionais exigem login
 
 ---
@@ -63,12 +65,19 @@ Formulário de Cotação (Django)
    ├──► MongoDB (coleção "cotacoes")
    │     simulação completa, schema flexível por tipo de seguro
    │
+   ├──► PostgreSQL (Cotação)
+   │     status comercial e vínculo com cliente, ramo, plano e simulação
+   │
    └──► [Fechar Negócio] ──► PostgreSQL
-         Cliente / Bem / Seguradora / Plano / Apólice
+         Cliente / Bem / Seguradora / Plano / Apólice / Sinistro / Comissão
          registro de contrato, íntegro e transacional (ACID)
 ```
 
-A escolha híbrida não é estética: cotações variam de estrutura por tipo de seguro (automóvel, vida ou saúde), o que pede um modelo *schema-less*. Já o contrato fechado (apólice) exige integridade referencial — daí o PostgreSQL. Registros residenciais antigos são preservados como históricos e não aparecem como ramo disponível para novas cotações.
+A escolha híbrida não é estética: o documento completo da simulação mantém flexibilidade no MongoDB. O PostgreSQL também mantém uma cotação relacional resumida, ligada à simulação e às entidades comerciais, para acompanhar status e conversão com integridade referencial. Apólices, sinistros, renovações e recebimentos ficam no PostgreSQL.
+
+O catálogo admite outros ramos além de automóvel, vida e saúde. A análise automática por IA e os formulários específicos estão implementados apenas para esses três; cadastrar outro ramo não implica que já exista regra de cálculo. Valores de comissão podem ficar em branco e, nesse caso, o sistema não estima comissão para a apólice.
+
+Para vincular o histórico já existente no MongoDB às novas cotações relacionais, execute primeiro a prévia `python manage.py migrar_cotacoes_relacionais`; revise a contagem e só então use `python manage.py migrar_cotacoes_relacionais --apply`. O comando é idempotente, preserva os documentos MongoDB e não importa registros sem cliente ou ramo correspondente.
 
 ---
 
@@ -91,7 +100,7 @@ frank-costa-crm/
 │   ├── settings.py
 │   └── urls.py
 ├── cotacoes/                  # app principal
-│   ├── models.py              # Cliente, Bem, Seguradora, Plano, Apolice (PostgreSQL)
+│   ├── models.py              # catálogo, clientes, cotações e carteira (PostgreSQL)
 │   ├── nosql.py                # camada de acesso ao MongoDB
 │   ├── motor_ia.py             # sistema especialista (IA Simbólica)
 │   ├── utils.py                # normalização de CPF/telefone
@@ -132,7 +141,8 @@ python manage.py migrate
 # 6. Superusuário (acesso ao /admin/)
 python manage.py createsuperuser
 
-# 7. (Opcional) Popular com dados fictícios para demonstração
+# 7. (Opcional) Popular com dados sintéticos para demonstração
+#    Cadastre antes planos ativos e percentuais de comissão confirmados
 python manage.py popular_dados --limpar
 
 # 8. Rodar
@@ -148,7 +158,7 @@ Acesse `http://127.0.0.1:8000/` e o painel Streamlit em `http://localhost:8501/`
 
 ## Dados de demonstração
 
-O comando `popular_dados` gera, a cada execução, 50 clientes, 50 apólices ativas e 50 cotações adicionais não fechadas. O mix ativo é uma premissa sintética de demonstração: 30 apólices de automóvel, 10 de vida e 10 de saúde. Também cria 48 decisões de renovação distribuídas pelos últimos 24 meses e valores mensais demonstrativos para automóvel, vida e saúde ao longo do mesmo período.
+O comando `popular_dados` gera, a cada execução, 50 clientes, 50 apólices ativas e 50 cotações adicionais não fechadas, desde que existam planos ativos e percentuais de comissão confirmados para automóvel, vida e saúde. O mix ativo é uma premissa sintética de demonstração: 30 apólices de automóvel, 10 de vida e 10 de saúde. Também cria 48 decisões de renovação distribuídas pelos últimos 24 meses e valores mensais demonstrativos para automóvel, vida e saúde ao longo do mesmo período. O comando não cria seguradoras, identificadores, produtos, coberturas ou percentuais presumidos.
 
 As comissões da carteira são calculadas a partir do percentual cadastrado nos planos. Separadamente, o cenário demonstrativo gera de R$ 6 mil a R$ 12 mil de comissão bruta mensal, com margem líquida acadêmica estimada em 75%. São valores fictícios e não representam dados contábeis nem percentuais reais garantidos pelas seguradoras. A tabela de comissão mensal requer a migração do modelo demonstrativo.
 

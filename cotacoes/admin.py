@@ -14,17 +14,28 @@ from .models import (
     Bem,
     Cliente,
     ComissaoMensalDemonstracao,
+    Cotacao,
     Plano,
+    RecebimentoComissao,
     RenovacaoApolice,
     Seguradora,
+    Sinistro,
+    TipoSeguro,
 )
 
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ("nome", "cpf", "email", "telefone", "ativo", "dados_sinteticos")
-    search_fields = ("nome", "cpf")
-    list_filter = ("ativo", "dados_sinteticos")
+    list_display = ("nome", "tipo_pessoa", "cpf", "cnpj", "email", "telefone", "corretor_responsavel", "ativo")
+    search_fields = ("nome", "cpf", "cnpj", "email", "telefone")
+    list_filter = ("tipo_pessoa", "ativo", "dados_sinteticos", "estado")
+
+
+@admin.register(TipoSeguro)
+class TipoSeguroAdmin(admin.ModelAdmin):
+    list_display = ("nome", "codigo", "ativo")
+    list_filter = ("ativo",)
+    search_fields = ("nome", "codigo")
 
 
 @admin.register(Bem)
@@ -43,9 +54,17 @@ class SeguradoraAdmin(admin.ModelAdmin):
 
 @admin.register(Plano)
 class PlanoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "seguradora", "tipo_seguro", "comissao_efetiva", "ativo")
-    list_filter = ("tipo_seguro", "ativo", "seguradora")
+    list_display = ("nome", "seguradora", "tipo", "tipo_seguro", "comissao_efetiva", "ativo")
+    list_filter = ("tipo", "tipo_seguro", "ativo", "seguradora")
     search_fields = ("nome", "seguradora__nome")
+
+
+@admin.register(Cotacao)
+class CotacaoAdmin(admin.ModelAdmin):
+    list_display = ("cliente", "tipo_seguro", "seguradora", "plano", "quantidade_vidas", "status", "data_cotacao", "validade")
+    list_filter = ("status", "tipo_seguro", "seguradora", "data_cotacao")
+    search_fields = ("cliente__nome", "cliente__cpf", "cliente__cnpj", "cotacao_mongo_id")
+    date_hierarchy = "data_cotacao"
 
 
 @admin.register(Apolice)
@@ -62,6 +81,22 @@ class RenovacaoApoliceAdmin(admin.ModelAdmin):
     list_filter = ("status", "data_vencimento")
     search_fields = ("apolice__numero_apolice", "apolice__cliente__nome")
     date_hierarchy = "data_vencimento"
+
+
+@admin.register(Sinistro)
+class SinistroAdmin(admin.ModelAdmin):
+    list_display = ("numero", "apolice", "data_ocorrencia", "status", "valor_reclamado", "valor_pago")
+    list_filter = ("status", "data_ocorrencia")
+    search_fields = ("numero", "apolice__numero_apolice", "apolice__cliente__nome")
+    date_hierarchy = "data_ocorrencia"
+
+
+@admin.register(RecebimentoComissao)
+class RecebimentoComissaoAdmin(admin.ModelAdmin):
+    list_display = ("apolice", "competencia", "valor_previsto", "valor_recebido", "status", "data_prevista", "data_recebimento")
+    list_filter = ("status", "competencia")
+    search_fields = ("apolice__numero_apolice", "apolice__cliente__nome")
+    date_hierarchy = "competencia"
 
 
 @admin.register(ComissaoMensalDemonstracao)

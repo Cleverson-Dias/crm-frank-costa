@@ -7,11 +7,15 @@ from django.test import SimpleTestCase
 
 from .analytics import calcular_taxa_retencao, gerar_comissoes_demonstracao
 from .motor_ia import avaliar_elegibilidade, calcular_proposta
-from .models import RenovacaoApolice
+from .models import Cliente, Cotacao, Plano, RenovacaoApolice, Seguradora, TipoSeguro
 from .views import montar_perfil_cotacao
 
 
 class FormularioCotacaoTests(SimpleTestCase):
+    def test_unimplemented_active_branch_is_not_treated_as_health(self):
+        with self.assertRaisesMessage(ValueError, "ainda não possui uma análise automática"):
+            montar_perfil_cotacao({"idade": "35", "valor_bem": "1000"}, "residencial")
+
     def test_auto_profile_captures_vehicle_and_driver_data(self):
         perfil, valor_estimado, _, descricao = montar_perfil_cotacao(
             {
@@ -198,3 +202,58 @@ class RenovacaoApoliceTests(SimpleTestCase):
 
         with self.assertRaises(ValidationError):
             renovacao.clean()
+
+
+class CadastroComercialTests(SimpleTestCase):
+    def test_person_company_requires_cnpj_instead_of_cpf(self):
+        cliente = Cliente(tipo_pessoa="pj", nome="Empresa")
+
+        with self.assertRaises(ValidationError) as contexto:
+            cliente.clean()
+
+        self.assertIn("cnpj", contexto.exception.message_dict)
+
+    def test_person_company_rejects_personal_document(self):
+        cliente = Cliente(
+            tipo_pessoa="pj",
+            nome="Empresa",
+            cpf="12345678901",
+            cnpj="12345678000199",
+        )
+
+        with self.assertRaises(ValidationError) as contexto:
+            cliente.clean()
+
+        self.assertIn("cpf", contexto.exception.message_dict)
+
+    def test_unknown_commission_remains_unset(self):
+        seguradora = Seguradora(nome="Seguradora", cnpj="123")
+        plano = Plano(
+            seguradora=seguradora,
+            tipo_seguro="vida",
+            nome="Produto",
+        )
+
+        self.assertIsNone(plano.comissao_efetiva())
+
+    def test_bradesco_health_quote_requires_multiple_lives(self):
+        cliente = Cliente(
+            id=1,
+            tipo_pessoa="pj",
+            nome="Empresa",
+            cnpj="12345678000199",
+        )
+        tipo = TipoSeguro(id=1, codigo="saude", nome="Saúde")
+        seguradora = Seguradora(id=1, nome="Bradesco Saúde", cnpj=None)
+        cotacao = Cotacao(
+            cliente=cliente,
+            tipo_seguro=tipo,
+            seguradora=seguradora,
+            quantidade_vidas=1,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "pelo menos duas vidas"):
+            cotacao.clean()
+
+        cotacao.quantidade_vidas = 2
+        cotacao.clean()

@@ -18,24 +18,61 @@
                 <form method="post" action="{% url 'novo_cliente' %}">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Nome Completo</label>
-                        <input type="text" name="nome" class="form-control" required>
+                        <label for="tipo-pessoa" class="form-label small fw-semibold">Tipo de pessoa</label>
+                        <select id="tipo-pessoa" name="tipo_pessoa" class="form-select" required>
+                            <option value="pf" {% if form_data.tipo_pessoa != "pj" %}selected{% endif %}>Pessoa Física</option>
+                            <option value="pj" {% if form_data.tipo_pessoa == "pj" %}selected{% endif %}>Pessoa Jurídica</option>
+                        </select>
                     </div>
                     <div class="mb-3">
+                        <label id="nome-label" class="form-label small fw-semibold">Nome completo</label>
+                        <input type="text" name="nome" class="form-control" value="{{ form_data.nome|default:'' }}" maxlength="150" required>
+                    </div>
+                    <div class="mb-3" data-pessoa="pf">
                         <label class="form-label small fw-semibold">CPF</label>
-                        <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" required>
+                        <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" value="{{ form_data.cpf|default:'' }}" data-obrigatorio>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3" data-pessoa="pj" hidden>
+                        <label class="form-label small fw-semibold">CNPJ</label>
+                        <input type="text" name="cnpj" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="14" value="{{ form_data.cnpj|default:'' }}" data-obrigatorio disabled>
+                    </div>
+                    <div class="mb-3" data-pessoa="pf">
                         <label class="form-label small fw-semibold">Data de Nascimento</label>
-                        <input type="date" name="data_nascimento" class="form-control" required>
+                        <input type="date" name="data_nascimento" class="form-control" value="{{ form_data.data_nascimento|default:'' }}" data-obrigatorio>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">E-mail</label>
-                        <input type="email" name="email" class="form-control">
+                        <input type="email" name="email" class="form-control" value="{{ form_data.email|default:'' }}">
                     </div>
                     <div class="mb-4">
                         <label class="form-label small fw-semibold">Telefone</label>
-                        <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11">
+                        <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11" value="{{ form_data.telefone|default:'' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Profissão ou atividade</label>
+                        <input type="text" name="profissao" class="form-control" maxlength="150" value="{{ form_data.profissao|default:'' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Endereço</label>
+                        <input type="text" name="endereco" class="form-control" maxlength="255" value="{{ form_data.endereco|default:'' }}">
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cidade</label>
+                            <input type="text" name="cidade" class="form-control" maxlength="100" value="{{ form_data.cidade|default:'' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">UF</label>
+                            <input type="text" name="estado" class="form-control" maxlength="2" value="{{ form_data.estado|default:'' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">CEP</label>
+                            <input type="text" name="cep" class="form-control" maxlength="9" value="{{ form_data.cep|default:'' }}">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Observações</label>
+                        <textarea name="observacoes" class="form-control" rows="3">{{ form_data.observacoes|default:'' }}</textarea>
                     </div>
                     <button type="submit" class="btn btn-primary-custom w-100 fw-bold">Cadastrar Cliente</button>
                 </form>
@@ -43,4 +80,27 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const tipoPessoa = document.getElementById("tipo-pessoa");
+    const nomeLabel = document.getElementById("nome-label");
+
+    function atualizarCamposPessoa() {
+        const tipo = tipoPessoa.value;
+        nomeLabel.textContent = tipo === "pj" ? "Razão social" : "Nome completo";
+        document.querySelectorAll("[data-pessoa]").forEach((grupo) => {
+            const ativo = grupo.dataset.pessoa === tipo;
+            grupo.hidden = !ativo;
+            grupo.querySelectorAll("input").forEach((campo) => {
+                campo.disabled = !ativo;
+                campo.required = ativo && campo.hasAttribute("data-obrigatorio");
+            });
+        });
+    }
+
+    tipoPessoa.addEventListener("change", atualizarCamposPessoa);
+    atualizarCamposPessoa();
+</script>
 {% endblock %}

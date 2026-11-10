@@ -7,7 +7,7 @@
     <div class="container">
         <p class="dashboard-eyebrow">Simulação</p>
         <h1 class="mb-1">Nova Cotação</h1>
-        <p class="text-muted mb-0">Escolha o ramo e preencha os dados do segurado e do seguro para iniciar a análise.</p>
+        <p class="text-muted mb-0">Escolha o ramo e o perfil do cliente. Cotações de pessoa jurídica são registradas para análise manual, sem cálculo automático.</p>
     </div>
 </section>
 
@@ -30,21 +30,58 @@
                             </select>
                             <span class="form-text">Os campos da cotação serão ajustados ao ramo escolhido.</span>
                         </div>
+                        <div class="col-md-6">
+                            <label for="seguradora" class="form-label small fw-semibold">Seguradora</label>
+                            <select name="seguradora_id" id="seguradora" class="form-select" disabled>
+                                <option value="">Selecione a seguradora</option>
+                                {% for seguradora in seguradoras_disponiveis %}
+                                <option value="{{ seguradora.id }}" {% if form_data.seguradora_id == seguradora.id|stringformat:"s" %}selected{% endif %}>{{ seguradora.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="plano" class="form-label small fw-semibold">Produto / Plano</label>
+                            <select name="plano_id" id="plano" class="form-select" disabled>
+                                <option value="">Selecione o produto ou plano</option>
+                                {% for plano in planos_disponiveis %}
+                                <option
+                                    value="{{ plano.id }}"
+                                    data-tipo="{{ plano.tipo_seguro }}"
+                                    data-seguradora="{{ plano.seguradora_id }}"
+                                    data-detalhes="{{ plano.modalidade }} · {{ plano.acomodacao }} · {{ plano.coparticipacao }} · {{ plano.cobertura_descricao }}"
+                                    {% if form_data.plano_id == plano.id|stringformat:"s" %}selected{% endif %}
+                                >{{ plano.seguradora.nome }} — {{ plano.nome }}{% if plano.modalidade %} · {{ plano.modalidade }}{% endif %}{% if plano.acomodacao %} · {{ plano.acomodacao }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="form-text">Opcional nesta etapa; é possível escolher o plano na emissão.</span>
+                            <span id="plano-detalhes" class="form-text d-block"></span>
+                        </div>
                     </div>
 
                     <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-person"></i> 2. Dados do Segurado</h6>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-7">
-                            <label class="form-label small fw-semibold">Nome do Cliente</label>
-                            <input type="text" name="nome" class="form-control" placeholder="Ex: Cleverson Alves" value="{{ form_data.nome|default:'' }}" required>
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label small fw-semibold">CPF</label>
-                            <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" value="{{ form_data.cpf|default:'' }}" required>
-                        </div>
                         <div class="col-md-4">
+                            <label for="tipo-pessoa-cotacao" class="form-label small fw-semibold">Perfil do cliente</label>
+                            <select name="tipo_pessoa" id="tipo-pessoa-cotacao" class="form-select" required>
+                                <option value="pf" {% if form_data.tipo_pessoa != "pj" %}selected{% endif %}>Pessoa Física</option>
+                                <option value="pj" {% if form_data.tipo_pessoa == "pj" %}selected{% endif %}>Pessoa Jurídica</option>
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label id="nome-cliente-label" class="form-label small fw-semibold">Nome do Cliente</label>
+                            <input type="text" name="nome" class="form-control" placeholder="Nome completo ou razão social" value="{{ form_data.nome|default:'' }}" maxlength="150" required>
+                        </div>
+                        <div class="col-md-5" data-pessoa="pf">
+                            <label class="form-label small fw-semibold">CPF</label>
+                            <input type="text" name="cpf" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="11" value="{{ form_data.cpf|default:'' }}" data-obrigatorio>
+                        </div>
+                        <div class="col-md-5" data-pessoa="pj" hidden>
+                            <label class="form-label small fw-semibold">CNPJ</label>
+                            <input type="text" name="cnpj" class="form-control" placeholder="Somente números" inputmode="numeric" maxlength="14" value="{{ form_data.cnpj|default:'' }}" data-obrigatorio disabled>
+                        </div>
+                        <div class="col-md-4" data-pessoa="pf">
                             <label for="idade-segurado" id="idade-label" class="form-label small fw-semibold">Idade do segurado</label>
-                            <input type="number" name="idade" id="idade-segurado" class="form-control" placeholder="Ex: 35" min="0" max="120" value="{{ form_data.idade|default:'' }}" required>
+                            <input type="number" name="idade" id="idade-segurado" class="form-control" placeholder="Ex: 35" min="0" max="120" value="{{ form_data.idade|default:'' }}" data-obrigatorio>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-semibold">E-mail</label>
@@ -54,6 +91,31 @@
                             <label class="form-label small fw-semibold">Telefone</label>
                             <input type="text" name="telefone" class="form-control" placeholder="DDD + número" inputmode="numeric" maxlength="11" value="{{ form_data.telefone|default:'' }}">
                         </div>
+                    </div>
+
+                    <div class="row g-3 mb-4" id="dados-pj-manual" hidden>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Atividade da empresa</label>
+                            <input type="text" name="atividade_empresa" class="form-control" maxlength="150" value="{{ form_data.atividade_empresa|default:'' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Pessoa de contato</label>
+                            <input type="text" name="contato_nome" class="form-control" maxlength="150" value="{{ form_data.contato_nome|default:'' }}">
+                        </div>
+                        <div class="col-12" id="quantidade-vidas-wrapper" hidden>
+                            <label for="quantidade-vidas" class="form-label small fw-semibold">Quantidade de vidas</label>
+                            <input type="number" name="quantidade_vidas" id="quantidade-vidas" class="form-control" min="1" step="1" value="{{ form_data.quantidade_vidas|default:'' }}">
+                            <span class="form-text">Para Bradesco Saúde, cotação individual (uma vida) não é permitida.</span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cobertura solicitada</label>
+                            <textarea name="cobertura_solicitada" class="form-control" rows="2" maxlength="2000">{{ form_data.cobertura_solicitada|default:'' }}</textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Descrição do risco / necessidade</label>
+                            <textarea name="descricao_risco" class="form-control" rows="2" maxlength="2000">{{ form_data.descricao_risco|default:'' }}</textarea>
+                        </div>
+                        <p class="form-text mb-0">A cotação PJ será registrada sem estimativa de prêmio. Complete a análise com a seguradora e atualize os valores e o status no cadastro da cotação.</p>
                     </div>
 
                     <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi-clipboard-check"></i> 3. Dados da Cotação</h6>
@@ -218,7 +280,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary-custom w-100 py-2 fw-bold">
+                    <button type="submit" id="submit-cotacao" class="btn btn-primary-custom w-100 py-2 fw-bold">
                         <i class="bi-cpu"></i> Analisar e Calcular
                     </button>
                 </form>
@@ -231,10 +293,19 @@
 {% block extra_scripts %}
 <script>
     const tipoSeguro = document.getElementById("tipo-seguro");
+    const tipoPessoa = document.getElementById("tipo-pessoa-cotacao");
+    const nomeClienteLabel = document.getElementById("nome-cliente-label");
     const idadeLabel = document.getElementById("idade-label");
+    const dadosPjManual = document.getElementById("dados-pj-manual");
+    const quantidadeVidasWrapper = document.getElementById("quantidade-vidas-wrapper");
+    const quantidadeVidas = document.getElementById("quantidade-vidas");
+    const submitCotacao = document.getElementById("submit-cotacao");
     const condutorAdicional = document.getElementById("condutor-adicional");
     const idadeAdicionalWrapper = document.getElementById("idade-condutor-adicional-wrapper");
     const idadeAdicional = document.getElementById("idade-condutor-adicional");
+    const seguradoraSelect = document.getElementById("seguradora");
+    const planoSelect = document.getElementById("plano");
+    const planoDetalhes = document.getElementById("plano-detalhes");
     const configuracoes = {
         auto: "Idade do condutor principal",
         vida: "Idade da pessoa segurada",
@@ -243,17 +314,85 @@
 
     function atualizarCamposPorRamo() {
         const ramo = tipoSeguro.value;
+        const ehPessoaFisica = tipoPessoa.value === "pf";
         idadeLabel.textContent = configuracoes[ramo] || "Idade do segurado";
+        nomeClienteLabel.textContent = ehPessoaFisica ? "Nome do Cliente" : "Razão Social";
+        atualizarSeguradoras(ramo);
 
         document.querySelectorAll("[data-ramo]").forEach((grupo) => {
-            const ativo = grupo.dataset.ramo === ramo;
+            const ativo = ehPessoaFisica && grupo.dataset.ramo === ramo;
             grupo.hidden = !ativo;
             grupo.querySelectorAll("input, select").forEach((campo) => {
                 campo.disabled = !ativo;
                 campo.required = ativo && campo.hasAttribute("data-obrigatorio");
             });
         });
+        document.querySelectorAll("[data-pessoa]").forEach((grupo) => {
+            const ativo = grupo.dataset.pessoa === tipoPessoa.value;
+            grupo.hidden = !ativo;
+            grupo.querySelectorAll("input").forEach((campo) => {
+                campo.disabled = !ativo;
+                campo.required = ativo && campo.hasAttribute("data-obrigatorio");
+            });
+        });
+        const ehCotacaoManual = !ehPessoaFisica;
+        dadosPjManual.hidden = !ehCotacaoManual;
+        dadosPjManual.querySelectorAll("input, textarea").forEach((campo) => {
+            campo.disabled = !ehCotacaoManual;
+        });
+        const solicitaVidas = ehCotacaoManual && ramo === "saude";
+        quantidadeVidasWrapper.hidden = !solicitaVidas;
+        quantidadeVidas.disabled = !solicitaVidas;
+        quantidadeVidas.required = solicitaVidas;
+        atualizarMinimoDeVidas();
+        submitCotacao.innerHTML = ehCotacaoManual
+            ? "Registrar Cotação Manual"
+            : '<i class="bi-cpu"></i> Analisar e Calcular';
         atualizarCondutorAdicional();
+    }
+
+    function atualizarSeguradoras(ramo) {
+        const seguradorasDisponiveis = new Set(
+            Array.from(planoSelect.options)
+                .filter((opcao) => opcao.dataset.tipo === ramo)
+                .map((opcao) => opcao.dataset.seguradora)
+        );
+        Array.from(seguradoraSelect.options).forEach((opcao, indice) => {
+            if (indice === 0) return;
+            opcao.hidden = !seguradorasDisponiveis.has(opcao.value);
+            if (opcao.hidden && opcao.selected) seguradoraSelect.value = "";
+        });
+        seguradoraSelect.disabled = !ramo || seguradorasDisponiveis.size === 0;
+        atualizarPlanos();
+    }
+
+    function atualizarPlanos() {
+        const ramo = tipoSeguro.value;
+        const seguradoraId = seguradoraSelect.value;
+        Array.from(planoSelect.options).forEach((opcao, indice) => {
+            if (indice === 0) return;
+            const disponivel = opcao.dataset.tipo === ramo
+                && opcao.dataset.seguradora === seguradoraId;
+            opcao.hidden = !disponivel;
+            if (!disponivel && opcao.selected) planoSelect.value = "";
+        });
+        planoSelect.disabled = !ramo || !seguradoraId;
+        atualizarMinimoDeVidas();
+        atualizarDetalhesPlano();
+    }
+
+    function atualizarMinimoDeVidas() {
+        const seguradoraSelecionada = seguradoraSelect.selectedOptions[0];
+        const bradescoEmpresarial = tipoPessoa.value === "pj"
+            && tipoSeguro.value === "saude"
+            && seguradoraSelecionada
+            && seguradoraSelecionada.textContent.toLowerCase().includes("bradesco");
+        quantidadeVidas.min = bradescoEmpresarial ? "2" : "1";
+    }
+
+    function atualizarDetalhesPlano() {
+        const opcao = planoSelect.selectedOptions[0];
+        planoDetalhes.textContent = opcao ? opcao.dataset.detalhes || "" : "";
     }
 
     function atualizarCondutorAdicional() {
@@ -264,6 +403,9 @@
     }
 
     tipoSeguro.addEventListener("change", atualizarCamposPorRamo);
+    tipoPessoa.addEventListener("change", atualizarCamposPorRamo);
+    seguradoraSelect.addEventListener("change", atualizarPlanos);
+    planoSelect.addEventListener("change", atualizarDetalhesPlano);
     condutorAdicional.addEventListener("change", atualizarCondutorAdicional);
     atualizarCamposPorRamo();
 </script>

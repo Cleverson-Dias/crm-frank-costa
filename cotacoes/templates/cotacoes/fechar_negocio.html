@@ -34,7 +34,7 @@
                     <select name="plano_id" class="form-select mb-4" required>
                         {% for plano in planos_disponiveis %}
                             <option value="{{ plano.id }}">
-                                {{ plano.seguradora.nome }} — {{ plano.nome }} (comissão {{ plano.comissao_efetiva }}%)
+                                {{ plano.seguradora.nome }} — {{ plano.nome }}{% if plano.comissao_efetiva %} (comissão cadastrada: {{ plano.comissao_efetiva }}%){% else %} (comissão não informada){% endif %}
                             </option>
                         {% endfor %}
                     </select>

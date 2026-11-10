@@ -26,9 +26,11 @@
                 <thead>
                     <tr>
                         <th>Nome</th>
-                        <th>CPF</th>
+                        <th>Perfil</th>
+                        <th>CPF / CNPJ</th>
                         <th>E-mail</th>
                         <th>Telefone</th>
+                        <th>Corretor responsável</th>
                         <th>Bens Cadastrados</th>
                     </tr>
                 </thead>
@@ -36,9 +38,11 @@
                     {% for cliente in clientes %}
                     <tr>
                         <td>{{ cliente.nome }}</td>
-                        <td>{{ cliente.cpf }}</td>
+                        <td>{{ cliente.get_tipo_pessoa_display }}</td>
+                        <td>{% if cliente.tipo_pessoa == "pj" %}{{ cliente.cnpj }}{% else %}{{ cliente.cpf }}{% endif %}</td>
                         <td>{{ cliente.email|default:"—" }}</td>
                         <td>{{ cliente.telefone|default:"—" }}</td>
+                        <td>{{ cliente.corretor_responsavel|default:"—" }}</td>
                         <td>{{ cliente.bens.count }}</td>
                     </tr>
                     {% endfor %}

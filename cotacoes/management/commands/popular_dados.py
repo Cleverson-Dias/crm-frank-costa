@@ -4,8 +4,9 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pandas as pd
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 
 from cotacoes import motor_ia, nosql
 from cotacoes.analytics import deslocar_mes, gerar_comissoes_demonstracao
@@ -16,8 +17,6 @@ from cotacoes.models import (
     ComissaoMensalDemonstracao,
     Plano,
     RenovacaoApolice,
-    Seguradora,
-    TIPOS_SEGURO_ATIVOS,
 )
 from cotacoes.utils import somente_digitos
 
@@ -65,10 +64,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         random.seed(2026)
+        self._validar_planos_com_comissao()
         if options["limpar"]:
             self._limpar_dados_anteriores()
 
-        self._criar_seguradoras_e_planos()
         cpfs_usados = set(Cliente.objects.values_list("cpf", flat=True))
         ramos_ativos = [
             ramo
@@ -192,7 +191,7 @@ class Command(BaseCommand):
 
     def _perfil_ativo(self, ramo, plano):
         comissao = float(COMISSAO_ANUAL_POR_RAMO[ramo])
-        percentual = float(plano.comissao_efetiva())
+        percentual = self._percentual_comissao_exigido(plano)
         premio = comissao / (percentual / 100)
         if ramo == "auto":
             valor_bem = premio / motor_ia.TAXA_BASE[ramo]
@@ -257,8 +256,9 @@ class Command(BaseCommand):
 
     def _criar_apolice(self, cliente, bem, plano, cotacao_id, resultado, hoje):
         premio = Decimal(str(resultado["premio"]))
+        percentual = self._percentual_comissao_exigido(plano)
         comissao = Decimal(str(round(
-            float(premio) * float(plano.comissao_efetiva()) / 100, 2
+            float(premio) * percentual / 100, 2
         )))
         data_inicio = hoje - timedelta(days=random.randint(20, 200))
         return Apolice.objects.create(
@@ -275,6 +275,15 @@ class Command(BaseCommand):
             data_fim=data_inicio + timedelta(days=365),
             status="ativa",
         )
+
+    def _percentual_comissao_exigido(self, plano):
+        percentual = plano.comissao_efetiva()
+        if percentual is None or percentual <= 0:
+            raise CommandError(
+                f"Cadastre um percentual de comissão válido no plano "
+                f"'{plano.nome}' antes de gerar dados demonstrativos."
+            )
+        return float(percentual)
 
     def _criar_historico_renovacoes(self, clientes_e_apolices):
         hoje = date.today()
@@ -343,10 +352,22 @@ class Command(BaseCommand):
 
     def _plano_ativo(self, ramo):
         planos = list(Plano.objects.filter(
-            tipo_seguro=ramo, ativo=True, seguradora__ativa=True
+            tipo_seguro=ramo,
+            ativo=True,
+            seguradora__ativa=True,
+        ).filter(
+            Q(percentual_comissao__isnull=False)
+            | Q(seguradora__comissao_padrao__isnull=False)
         ).select_related("seguradora"))
+        planos = [
+            plano for plano in planos
+            if plano.comissao_efetiva() is not None
+            and plano.comissao_efetiva() > 0
+        ]
         if not planos:
-            raise RuntimeError(f"Nenhum plano ativo cadastrado para o ramo '{ramo}'.")
+            raise CommandError(
+                f"Nenhum plano ativo com comissão confirmada para o ramo '{ramo}'."
+            )
         return random.choice(planos)
 
     def _numero_apolice_unico(self, ano):
@@ -392,32 +413,30 @@ class Command(BaseCommand):
             "dados não identificados como sintéticos, seguradoras e planos foram mantidos.\n"
         )
 
-    def _criar_seguradoras_e_planos(self):
-        dados_seguradoras = [
-            {"nome": "Allianz", "cnpj": "06.193.425/0001-33", "comissao_padrao": Decimal("12.00")},
-            {"nome": "Azul Seguros", "cnpj": "04.598.082/0001-13", "comissao_padrao": Decimal("12.00")},
-            {"nome": "Bradesco Seguros", "cnpj": "33.055.146/0001-93", "comissao_padrao": Decimal("10.00")},
-            {"nome": "Porto Seguro", "cnpj": "61.198.164/0001-60", "comissao_padrao": Decimal("15.00")},
-            {"nome": "SulAmérica", "cnpj": "01.938.018/0001-56", "comissao_padrao": Decimal("12.50")},
-            {"nome": "Tokio Marine Seguradora", "cnpj": "33.164.021/0001-00", "comissao_padrao": Decimal("18.00")},
-        ]
-        for dados in dados_seguradoras:
-            seguradora, _ = Seguradora.objects.get_or_create(
-                cnpj=dados["cnpj"],
-                defaults={
-                    "nome": dados["nome"],
-                    "comissao_padrao": dados["comissao_padrao"],
-                },
+    def _validar_planos_com_comissao(self):
+        ramos = ("auto", "vida", "saude")
+        ramos_sem_comissao = []
+        for ramo in ramos:
+            planos = list(Plano.objects.filter(
+                tipo_seguro=ramo,
+                ativo=True,
+                seguradora__ativa=True,
+            ).filter(
+                Q(percentual_comissao__isnull=False)
+                | Q(seguradora__comissao_padrao__isnull=False)
+            ).select_related("seguradora"))
+            if not any(
+                plano.comissao_efetiva() is not None
+                and plano.comissao_efetiva() > 0
+                for plano in planos
+            ):
+                ramos_sem_comissao.append(ramo)
+        if ramos_sem_comissao:
+            raise CommandError(
+                "Cadastre produtos e percentuais de comissão confirmados para: "
+                f"{', '.join(ramos_sem_comissao)}. O gerador demonstrativo não cria "
+                "seguradoras, produtos ou percentuais presumidos."
             )
-            for tipo, label in TIPOS_SEGURO_ATIVOS:
-                Plano.objects.get_or_create(
-                    seguradora=seguradora,
-                    tipo_seguro=tipo,
-                    nome=f"{label} Completo {seguradora.nome.split()[0]}",
-                    defaults={
-                        "cobertura_descricao": f"Cobertura de demonstração de {label.lower()}.",
-                    },
-                )
 
     def _demonstrar_higienizacao_rf07(self, registros):
         df = pd.DataFrame(registros)

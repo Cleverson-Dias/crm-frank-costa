@@ -1,0 +1,46 @@
+{% extends "cotacoes/base.html" %}
+
+{% block title %}Cotação Manual | Frank Costa{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div class="container">
+        <p class="dashboard-eyebrow">Cotação empresarial</p>
+        <h1 class="mb-1">Cotação registrada</h1>
+        <p class="text-muted mb-0">{{ cliente.nome }} · {{ tipo_seguro.nome }}</p>
+    </div>
+</section>
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card-app">
+                <h2 class="h5 fw-bold">Análise manual necessária</h2>
+                <p class="text-muted">
+                    Nenhum prêmio ou comissão foi estimado. Solicite a proposta à seguradora e atualize
+                    o status e os valores desta cotação no Django Admin antes de emitir uma apólice.
+                </p>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">{{ cotacao.get_status_display }}</dd>
+                    <dt class="col-sm-4">Seguradora</dt>
+                    <dd class="col-sm-8">{{ cotacao.seguradora|default:"Ainda não selecionada" }}</dd>
+                    <dt class="col-sm-4">Produto</dt>
+                    <dd class="col-sm-8">{{ plano|default:"Ainda não selecionado" }}</dd>
+                    {% if cotacao.quantidade_vidas %}
+                    <dt class="col-sm-4">Quantidade de vidas</dt>
+                    <dd class="col-sm-8">{{ cotacao.quantidade_vidas }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+            <div class="d-flex gap-3 mt-4">
+                <a href="{% url 'nova_cotacao' %}" class="btn btn-primary-custom">Nova cotação</a>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-custom">Ver dashboard</a>
+            </div>
+            <p class="text-muted small mt-3 mb-0">
+                Registro comercial #{{ cotacao.id }} · Documento de apoio no MongoDB: <code>{{ cotacao_id }}</code>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
