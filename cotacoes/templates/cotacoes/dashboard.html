@@ -33,14 +33,14 @@
             <div class="card-app indicator-card">
                 <span class="indicator-label">Apólices Ativas</span>
                 <span class="indicator-value">{{ apolices_ativas_count }}</span>
-                <span class="indicator-note">Negócios fechados de verdade</span>
+                <span class="indicator-note">Contratos vigentes na carteira</span>
             </div>
         </div>
             <div class="col-6 col-lg-3">
                 <div class="card-app indicator-card">
-                    <span class="indicator-label">Comissão Realizada</span>
+                    <span class="indicator-label">Comissão Realizada (Anual)</span>
                     <span class="indicator-value">R$ {{ comissao_realizada|floatformat:2 }}</span>
-                    <span class="indicator-note">Sobre apólices ativas</span>
+                    <span class="indicator-note">R$ {{ comissao_mensal_estimada|floatformat:2 }}/mês sobre {{ apolices_ativas_count }} apólices ativas</span>
                 </div>
             </div>
         </div>

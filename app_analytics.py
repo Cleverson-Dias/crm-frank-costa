@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import calendar
+import math
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -21,11 +22,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "crm_core.settings")
 django.setup()
 
 from django.conf import settings
-from cotacoes.analytics import (
-    PARECERES_FAVORAVEIS,
-    calcular_taxa_retencao,
-    deslocar_mes,
-)
+from cotacoes.analytics import calcular_taxa_retencao, deslocar_mes
 from cotacoes.models import (
     Apolice,
     Cliente,
@@ -47,36 +44,36 @@ MESES = [
 ]
 PERIODOS = ("Últimos 12 meses", "Últimos 24 meses", "Ano atual", "Personalizado")
 CORES = {
-    "brand": "#16845b",
-    "brand_dark": "#086346",
-    "mint": "#dff3ea",
-    "navy": "#163b35",
-    "ink": "#253a35",
-    "muted": "#71827c",
-    "line": "#e4ece8",
-    "page": "#f4f7f5",
-    "orange": "#e69a54",
-    "blue": "#6d9fc6",
-    "red": "#d97470",
-    "purple": "#9279b7",
+    "brand": "#0284c7",
+    "brand_dark": "#0369a1",
+    "mint": "#10b981",
+    "navy": "#0f172a",
+    "ink": "#1e293b",
+    "muted": "#64748b",
+    "line": "#e2e8f0",
+    "page": "#f4f7fb",
+    "orange": "#f59e0b",
+    "blue": "#06b6d4",
+    "red": "#ef4444",
+    "purple": "#8b5cf6",
 }
 CORES_STATUS = {
-    "Aprovada": "#16845b",
-    "Aprovada com Fator de Risco": "#67aa83",
-    "Cobertura Autorizada": "#67aa83",
-    "Atendimento Liberado": "#67aa83",
-    "Análise Manual": "#e69a54",
-    "Análise Médica ou Manual": "#e69a54",
-    "Necessita de Vistoria": "#e69a54",
-    "Pendência de Dados": "#d9b752",
-    "Recusada": "#d97470",
-    "Não Coberto": "#d97470",
-    "Análise pendente": "#9ba9a4",
+    "Aprovada": "#0284c7",
+    "Aprovada com Fator de Risco": "#10b981",
+    "Cobertura Autorizada": "#10b981",
+    "Atendimento Liberado": "#10b981",
+    "Análise Manual": "#f59e0b",
+    "Análise Médica ou Manual": "#f59e0b",
+    "Necessita de Vistoria": "#8b5cf6",
+    "Pendência de Dados": "#f59e0b",
+    "Recusada": "#ef4444",
+    "Não Coberto": "#ef4444",
+    "Análise pendente": "#64748b",
 }
 LIMITE_COTACOES = 10_000
 
 st.set_page_config(
-    page_title="Painel Gerencial | Frank Costa",
+    page_title="Painel Estatístico e Analítico | Frank Costa",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -94,7 +91,7 @@ st.markdown(
         --page: {CORES["page"]};
     }}
     .stApp {{ background: var(--page); color: var(--ink); }}
-    [data-testid="stHeader"] {{ background: rgba(244,247,245,.94); }}
+    [data-testid="stHeader"] {{ background: rgba(244,247,251,.94); }}
     [data-testid="stToolbar"], [data-testid="stStatusWidget"], #MainMenu, footer {{
         display:none !important;
     }}
@@ -102,14 +99,14 @@ st.markdown(
         background:var(--page); color:var(--ink);
     }}
     [data-testid="stSidebar"] {{
-        background: #fff;
-        border-right: 1px solid var(--line);
+        background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);
+        border-right: 0;
     }}
     [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] .stMarkdown p,
     [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {{
-        color:#344d44;
+        color:#e2e8f0;
     }}
     [data-testid="stSidebar"] > div:first-child {{ padding-top: 1.15rem; }}
     .block-container {{
@@ -120,36 +117,31 @@ st.markdown(
     .brand-symbol {{
         display:flex; align-items:center; justify-content:center;
         width:2.55rem; height:2.55rem; border-radius:.8rem;
-        background:linear-gradient(145deg,#2aa879,#086346);
+        background:linear-gradient(145deg,#38bdf8,#0284c7);
         color:#fff; font-size:1.35rem; font-weight:800;
         box-shadow:0 6px 16px rgba(8,99,70,.18);
     }}
-    .brand-name {{ color:#176f50; font-family:Georgia,serif; font-size:1.15rem;
+    .brand-name {{ color:#f8fafc; font-family:Inter,Arial,sans-serif; font-size:1.05rem;
         font-weight:700; letter-spacing:.09em; line-height:1.05; }}
-    .brand-subtitle {{ color:#82918b; font-size:.58rem; letter-spacing:.28em;
+    .brand-subtitle {{ color:#94a3b8; font-size:.58rem; letter-spacing:.28em;
         margin-top:.22rem; text-transform:uppercase; }}
     .hero {{
         position:relative; overflow:hidden;
-        background:linear-gradient(115deg,#0c6a4c 0%,#16845b 58%,#28a477 100%);
-        border-radius:1.2rem; padding:1.65rem 2rem;
-        box-shadow:0 14px 32px rgba(9,94,66,.15);
+        background:transparent;
+        border-radius:0; padding:.45rem .35rem 1.1rem;
+        box-shadow:none;
         margin-bottom:1.25rem;
     }}
-    .hero:after {{
-        content:""; position:absolute; width:19rem; height:19rem; border-radius:50%;
-        border:1px solid rgba(255,255,255,.14); right:5%; top:-12rem;
-        box-shadow:0 0 0 2.4rem rgba(255,255,255,.035),0 0 0 5rem rgba(255,255,255,.025);
-    }}
-    .hero-kicker {{ color:#b9e8d5; font-size:.69rem; font-weight:700;
+    .hero-kicker {{ color:#0284c7; font-size:.69rem; font-weight:750;
         letter-spacing:.16em; text-transform:uppercase; }}
-    .hero h1 {{ color:white; font-size:1.8rem; font-weight:700;
+    .hero h1 {{ color:#0f172a; font-size:1.8rem; font-weight:750;
         letter-spacing:-.025em; margin:.42rem 0 .35rem; }}
-    .hero p {{ color:rgba(255,255,255,.83); font-size:.94rem; margin:0; }}
-    .hero-meta {{ color:rgba(255,255,255,.75); font-size:.75rem;
+    .hero p {{ color:#64748b; font-size:.94rem; margin:0; }}
+    .hero-meta {{ color:#94a3b8; font-size:.75rem;
         margin-top:.9rem; }}
     div[data-testid="stMetric"] {{
-        background:#fff; border:1px solid var(--line); border-radius:.9rem;
-        padding:1rem 1.1rem; box-shadow:0 5px 16px rgba(24,62,49,.045);
+        background:#fff; border:1px solid #e2e8f0; border-radius:1rem;
+        padding:1rem 1.1rem; box-shadow:0 4px 12px rgba(15,23,42,.03);
         min-height:7.8rem;
     }}
     [data-testid="stMetricLabel"] {{ min-height:2.3rem; align-items:flex-start; }}
@@ -162,7 +154,7 @@ st.markdown(
         white-space:normal !important; overflow:visible !important;
         text-overflow:clip !important; line-height:1.2;
     }}
-    div[data-testid="stMetricValue"] {{ color:#176f50 !important; font-size:1.48rem; font-weight:750; }}
+    div[data-testid="stMetricValue"] {{ color:#0f172a !important; font-size:1.48rem; font-weight:750; }}
     div[data-testid="stMetricDelta"] {{ font-size:.73rem; }}
     div[data-testid="stTabs"] button {{ font-weight:650; }}
     div[data-testid="stTabs"] button[aria-selected="true"] {{
@@ -171,25 +163,32 @@ st.markdown(
     div[data-testid="stTabs"] button {{ color:#425a50; }}
     div[data-testid="stWidgetLabel"] p, label, .stMarkdown p, .stMarkdown h1,
     .stMarkdown h2, .stMarkdown h3, [data-testid="stCaptionContainer"] {{
-        color:#40584f;
+        color:#475569;
     }}
     [data-testid="stPills"] button {{ border-radius:999px; }}
     [data-testid="stPills"] button[aria-pressed="true"] {{
-        background:#e4f3ec; border-color:#83bda2; color:#075f42;
+        background:#e0f2fe; border-color:#7dd3fc; color:#0369a1;
     }}
-    .section-heading {{ color:#183e35; font-size:1.05rem; font-weight:700;
+    .section-heading {{ color:#0f172a; font-size:1.05rem; font-weight:750;
         margin:.35rem 0 .2rem; }}
     .section-note {{ color:#82918b; font-size:.78rem; margin-bottom:.8rem; }}
-    .data-note {{ background:#e9f4ef; border:1px solid #d5e9df;
-        border-radius:.7rem; color:#356a56; padding:.7rem .9rem;
+    .data-note {{ background:#eff6ff; border:1px solid #bfdbfe;
+        border-radius:1rem; color:#1e40af; padding:.9rem 1rem;
         font-size:.8rem; }}
     .stButton button, .stDownloadButton button {{
         border-radius:.65rem; font-weight:650;
     }}
     .stButton button[kind="primary"] {{
-        background:#16845b; border-color:#16845b;
+        background:#0284c7; border-color:#0284c7;
     }}
-    .stCaption {{ color:#82918b; }}
+    .stCaption {{ color:#64748b; }}
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background:#ffffff; border:1px solid #e2e8f0; border-radius:1rem;
+        box-shadow:0 4px 12px rgba(15,23,42,.03); padding:.35rem .65rem .6rem;
+    }}
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] div,
+    [data-testid="stSidebar"] [data-testid="stMultiSelect"] div {{ color:#0f172a; }}
+    [data-testid="stSidebar"] hr {{ border-color:rgba(148,163,184,.22); }}
     @media (max-width: 800px) {{
         .block-container {{ padding:1rem 1rem 2rem; }}
         .hero {{ padding:1.3rem; }}
@@ -333,29 +332,74 @@ def carregar_dados_relacionais(ramos, data_inicio, data_fim, incluir_demonstraca
 
 
 def preparar_cotacoes(documentos, nomes_clientes):
+    """Normaliza documentos Mongo com subdocumentos opcionais e esquema legado."""
+    documentos_seguros = []
+    for documento in documentos or []:
+        if not isinstance(documento, dict):
+            continue
+        documento_seguro = dict(documento)
+        for campo in ("dados", "dados_bem", "resultado_calculo", "parecer_ia"):
+            if not isinstance(documento_seguro.get(campo), dict):
+                documento_seguro[campo] = {}
+        documentos_seguros.append(documento_seguro)
+    normalizados = pd.json_normalize(documentos_seguros, sep=".").fillna("")
     linhas = []
-    for documento in documentos:
-        dados = documento.get("dados") or documento.get("dados_bem") or {}
-        calculo = documento.get("resultado_calculo") or {}
-        parecer = documento.get("parecer_ia") or {}
+    for documento in normalizados.to_dict("records"):
+        ramo = documento.get("tipo_seguro") or "desconhecido"
+        mensalidade = (
+            documento.get("dados.mensalidade_estimada")
+            or documento.get("mensalidade_estimada")
+            or documento.get("dados.mensalidade_mensal")
+        ) if ramo == "saude" else None
+        premio = (
+            documento.get("resultado_calculo.premio_anual")
+            or documento.get("resultado_calculo.premio_bruto")
+            or documento.get("resultado_calculo.premio")
+            or documento.get("premio_anual")
+            or (documento.get("dados.premio_anual") if ramo == "saude" else None)
+            or (documento.get("dados.premio_anual_estimado") if ramo == "saude" else None)
+        )
+        if ramo == "saude" and not premio and mensalidade:
+            try:
+                premio = float(mensalidade) * 12
+            except (TypeError, ValueError):
+                premio = None
+        trilha = documento.get("parecer_ia.trilha_inferencia") or documento.get("trilha_inferencia")
+        tem_regra_e_motivo = bool(documento.get("parecer_ia.regra_id") and documento.get("parecer_ia.motivo"))
+        status = documento.get("parecer_ia.status") or documento.get("status") or "Análise pendente"
+        valor_bem = None
+        if ramo != "saude":
+            valor_bem = (
+                documento.get("dados.valor_bem") or documento.get("dados.valor_fipe")
+                or documento.get("dados.capital_segurado") or documento.get("dados_bem.valor_bem")
+                or documento.get("dados_bem.valor_fipe")
+            )
         linhas.append({
-            "id": str(documento.get("_id", "")),
+            "id": str(documento.get("_id") or ""),
             "cliente": nomes_clientes.get(documento.get("cliente_id"), "Cliente não localizado"),
-            "ramo": documento.get("tipo_seguro", "desconhecido"),
-            "premio": calculo.get("premio_bruto") or calculo.get("premio"),
-            "status": traducao_status(parecer.get("status", "Análise pendente")),
+            "ramo": ramo,
+            "mensalidade_estimada": mensalidade,
+            "premio": premio,
+            "valor_bem": valor_bem,
+            "status": traducao_status(status),
             "criado_em": documento.get("criado_em"),
-            "origem": dados.get("origem_dados", ""),
-            "sintetica": dados.get("origem_dados") == "demonstracao_sintetica",
+            "origem": documento.get("dados.origem_dados") or "",
+            "sintetica": documento.get("dados.origem_dados") == "demonstracao_sintetica",
+            "auditavel": bool(trilha) or tem_regra_e_motivo,
         })
-    df = pd.DataFrame(linhas, columns=[
-        "id", "cliente", "ramo", "premio", "status", "criado_em", "origem", "sintetica"
-    ])
-    if not df.empty:
-        df["premio"] = pd.to_numeric(df["premio"], errors="coerce")
-        df["criado_em"] = pd.to_datetime(df["criado_em"], errors="coerce", utc=True)
+    colunas = [
+        "id", "cliente", "ramo", "mensalidade_estimada", "premio", "valor_bem",
+        "status", "criado_em", "origem", "sintetica", "auditavel",
+    ]
+    df = pd.DataFrame(linhas, columns=colunas).fillna({
+        "id": "", "cliente": "Cliente não localizado", "ramo": "desconhecido",
+        "status": "Análise pendente", "origem": "", "sintetica": False, "auditavel": False,
+    })
+    df["premio"] = pd.to_numeric(df["premio"], errors="coerce")
+    df["mensalidade_estimada"] = pd.to_numeric(df["mensalidade_estimada"], errors="coerce")
+    df["valor_bem"] = pd.to_numeric(df["valor_bem"], errors="coerce")
+    df["criado_em"] = pd.to_datetime(df["criado_em"], errors="coerce", utc=True)
     return df
-
 
 def formatar_moeda(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -366,6 +410,11 @@ def primeiro_dia_do_mes(data_referencia, deslocamento=0):
 
 
 def traducao_status(status):
+    if status is None:
+        return "Análise pendente"
+    status = str(status).strip()
+    if not status or status.casefold() in {"null", "none", "não processado", "nao processado"}:
+        return "Análise pendente"
     traducoes = {
         "approved": "Aprovada",
         "approved with risk factor": "Aprovada com Fator de Risco",
@@ -637,15 +686,21 @@ taxa_retencao = calcular_taxa_retencao(
 ids_fechados = set(dados_relacionais["ids_cotacoes_fechadas"])
 cotacoes_fechadas = int(df["id"].isin(ids_fechados).sum()) if not df.empty else 0
 taxa_conversao = cotacoes_fechadas / len(df) * 100 if not df.empty else 0
-pareceres_favoraveis = int(df["status"].isin(PARECERES_FAVORAVEIS).sum()) if not df.empty else 0
-taxa_favoravel = pareceres_favoraveis / len(df) * 100 if not df.empty else 0
+pareceres_aprovados = int((df["status"] == "Aprovada").sum()) if not df.empty else 0
+taxa_aprovacao_ia = pareceres_aprovados / len(df) * 100 if not df.empty else 0
+valores_bens = pd.to_numeric(
+    df.loc[df["ramo"] != "saude", "valor_bem"], errors="coerce"
+).dropna()
+valores_bens = valores_bens[valores_bens > 0]
+mediana_valor_bens = valores_bens.median() if not valores_bens.empty else None
+percentual_auditavel = df["auditavel"].astype(bool).mean() * 100 if not df.empty else None
 
 st.markdown(
     f"""
     <section class="hero">
-      <div class="hero-kicker">Gestão da carteira</div>
-      <h1>Visão gerencial</h1>
-      <p>Decisões mais claras para cuidar do que importa.</p>
+      <div class="hero-kicker">CRM Frank Costa Corretora</div>
+      <h1>📊 Painel Estatístico e Analítico — CRM Frank Costa</h1>
+      <p>Explore e compreenda os dados de simulações, IA Simbólica e carteira de forma clara e interativa.</p>
       <div class="hero-meta">Frank Costa Corretora de Seguros &nbsp;·&nbsp;
         Dados atualizados em {datetime.now().strftime("%d/%m/%Y às %H:%M")}
       </div>
@@ -659,215 +714,192 @@ st.caption(
     f"· Ramos: {', '.join(RAMOS.get(ramo, ramo) for ramo in filtro_ramos)}"
 )
 
-kpis = st.columns(5)
-kpis[0].metric(
-    "Clientes ativos",
-    f"{dados_relacionais['clientes_na_carteira']:,}",
-    help="Clientes distintos com ao menos uma apólice vigente nos ramos selecionados.",
+kpis_principais = st.columns(4)
+kpis_principais[0].metric(
+    "Total de Simulações Registradas", f"{len(df):,}",
+    delta="Dados atualizados",
+    help="Cotações no período, ramos e pareceres selecionados.",
 )
-kpis[1].metric(
-    "Apólices vigentes",
-    f"{len(apolices):,}",
-    help="Quantidade de apólices com status ativo nos ramos selecionados.",
+kpis_principais[1].metric(
+    "Mediana do Valor dos Bens",
+    formatar_moeda(mediana_valor_bens) if mediana_valor_bens is not None else "Sem base",
+    help="Mediana dos valores positivos dos ramos com bem ou capital segurado; Saúde é excluída.",
 )
-kpis[2].metric(
-    "Comissão bruta/mês",
-    formatar_moeda(receita_media_mensal) if receita_media_mensal is not None else "Sem base",
-    help="Média mensal das comissões brutas dos ramos selecionados no período. Meses sem valor entram como zero.",
+kpis_principais[2].metric(
+    "Taxa de Aprovação da IA Simbólica",
+    f"{taxa_aprovacao_ia:.1f}%" if not df.empty else "Sem base",
+    help="Percentual de pareceres com status Aprovada nas simulações filtradas.",
 )
-kpis[3].metric(
-    "Líquido estimado/mês",
-    formatar_moeda(liquido_medio_mensal) if liquido_medio_mensal is not None else "Sem base",
-    help="Média mensal após a margem estimada de 75%, considerando período e ramos selecionados.",
-)
-kpis[4].metric(
-    "Retenção",
-    f"{taxa_retencao:.1f}%" if taxa_retencao is not None else "Sem base",
-    help=(
-        f"{dados_relacionais['renovacoes_concluidas']} renovadas de "
-        f"{dados_relacionais['renovacoes_elegiveis']} decisões no período e ramos selecionados."
-    ),
-)
-st.caption(
-    "O líquido mensal é estimado com margem acadêmica de 75%; não representa resultado contábil."
-)
-st.markdown(
-    '<div class="data-note">Período e ramos atualizam cotações, comissões e renovações. '
-    'Pareceres filtram as cotações; a carteira considera os ramos selecionados.</div>',
-    unsafe_allow_html=True,
+kpis_principais[3].metric(
+    "Auditabilidade LGPD (Art. 20)",
+    f"{percentual_auditavel:.1f}%" if percentual_auditavel is not None else "Sem base",
+    help="Simulações com trilha de inferência ou registro de regra e motivo para auditoria.",
 )
 
-st.markdown('<div class="section-heading">Comissão bruta mês a mês</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-note">Soma mensal para o período e os ramos selecionados. O filtro de pareceres afeta somente os gráficos e indicadores de cotações.</div>',
-    unsafe_allow_html=True,
+st.caption(
+    "A mediana é adotada como indicador oficial de tendência central por ser imune a "
+    "distorções causadas por veículos de alto valor (outliers)."
 )
-if receitas_por_mes.empty:
-    st.info("Não há valores demonstrativos para o período e os ramos selecionados.")
-else:
-    receitas_por_mes["mes_label"] = receitas_por_mes["mes_referencia"].map(
-        lambda mes: f"{MESES[mes.month - 1][:3].capitalize()}/{mes.year}"
-    )
-    fig_receita = px.area(
-        receitas_por_mes,
-        x="mes_referencia",
-        y="comissao_bruta",
-        markers=True,
-        color_discrete_sequence=[CORES["brand"]],
-        labels={"mes_referencia": "Mês", "comissao_bruta": "Comissão bruta"},
-    )
-    fig_receita.update_traces(
-        fill="tozeroy",
-        line=dict(width=3),
-        fillcolor="rgba(22,132,91,.12)",
-        marker=dict(size=6),
-        customdata=[
-            f"{mes} · Comissão bruta: {formatar_moeda(valor)}"
-            for mes, valor in zip(
-                receitas_por_mes["mes_label"], receitas_por_mes["comissao_bruta"]
-            )
-        ],
-        hovertemplate="%{customdata}<extra></extra>",
-    )
-    aplicar_estilo_grafico(fig_receita, 285)
-    fig_receita.update_xaxes(
-        tickmode="array",
-        tickvals=receitas_por_mes["mes_referencia"].tolist(),
-        ticktext=receitas_por_mes["mes_label"].tolist(),
-    )
-    fig_receita.update_yaxes(
-        title=None,
-        tickprefix="R$ ",
-        tickformat=",.0f",
-        separatethousands=True,
-    )
-    st.plotly_chart(fig_receita, width="stretch", config={"displayModeBar": False})
 
 tab_cotacoes, tab_carteira, tab_renovacoes = st.tabs(
-    ["Cotações & conversão", "Carteira & comissões", "Renovações"]
+    ["Análise estatística", "Carteira & comissões", "Renovações"]
 )
 
 with tab_cotacoes:
-    st.markdown('<div class="section-heading">Desempenho comercial</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="section-note">Acompanhe volume, qualidade e conversão no período selecionado.</div>',
-        unsafe_allow_html=True,
-    )
-    kpi_cotacoes = st.columns(4)
-    kpi_cotacoes[0].metric("Cotações no período", f"{len(df):,}")
-    kpi_cotacoes[1].metric("Negócios fechados", f"{cotacoes_fechadas:,}")
-    kpi_cotacoes[2].metric("Conversão", f"{taxa_conversao:.1f}%")
-    kpi_cotacoes[3].metric("Parecer favorável", f"{taxa_favoravel:.1f}%")
-
     if df.empty:
         st.info("Nenhuma cotação encontrada com os filtros atuais. Amplie o período ou revise os filtros.")
     else:
-        esquerda, direita = st.columns([1.2, 1])
-        with esquerda:
-            st.markdown('<div class="section-heading">Evolução das cotações</div>', unsafe_allow_html=True)
-            mensal = df.assign(
-                mes=df["criado_em"].dt.tz_localize(None).dt.to_period("M").dt.to_timestamp()
-            )
-            mensal = mensal.groupby("mes").size().reset_index(name="Cotações")
-            meses_selecionados = pd.date_range(
-                start=pd.Timestamp(data_inicio.year, data_inicio.month, 1),
-                end=pd.Timestamp(data_fim.year, data_fim.month, 1),
-                freq="MS",
-            )
-            mensal = (
-                mensal.set_index("mes")
-                .reindex(meses_selecionados, fill_value=0)
-                .rename_axis("mes")
-                .reset_index()
-            )
-            mensal["Mês"] = mensal["mes"].map(
-                lambda mes: f"{MESES[mes.month - 1][:3].capitalize()}/{mes.year}"
-            )
-            fig_tempo = px.area(
-                mensal,
-                x="mes",
-                y="Cotações",
-                markers=True,
-                color_discrete_sequence=[CORES["brand"]],
-                labels={"mes": "Mês", "Cotações": "Cotações"},
-            )
-            fig_tempo.update_traces(
-                fill="tozeroy",
-                line=dict(width=3),
-                fillcolor="rgba(22,132,91,.12)",
-                marker=dict(size=6),
-            )
-            aplicar_estilo_grafico(fig_tempo, 320)
-            fig_tempo.update_xaxes(
-                tickmode="array",
-                tickvals=mensal["mes"].tolist(),
-                ticktext=mensal["Mês"].tolist(),
-            )
-            st.plotly_chart(fig_tempo, width="stretch", config={"displayModeBar": False})
-        with direita:
-            st.markdown('<div class="section-heading">Distribuição por ramo</div>', unsafe_allow_html=True)
-            por_ramo = df.groupby("ramo").size().reset_index(name="Cotações")
-            por_ramo["Ramo"] = por_ramo["ramo"].map(RAMOS).fillna(por_ramo["ramo"])
-            fig_ramos = px.bar(
-                por_ramo.sort_values("Cotações"),
-                x="Cotações",
-                y="Ramo",
-                orientation="h",
-                text="Cotações",
-                color_discrete_sequence=[CORES["brand"]],
-            )
-            fig_ramos.update_traces(textposition="outside", cliponaxis=False)
-            aplicar_estilo_grafico(fig_ramos, 320)
-            fig_ramos.update_xaxes(showgrid=True, gridcolor="#edf1ef")
-            fig_ramos.update_yaxes(showgrid=False)
-            st.plotly_chart(fig_ramos, width="stretch", config={"displayModeBar": False})
+        por_status = df.groupby("status").size().reset_index(name="Simulações")
+        por_ramo = df.groupby("ramo").size().reset_index(name="Simulações")
+        por_ramo["Ramo"] = por_ramo["ramo"].map(RAMOS).fillna(por_ramo["ramo"])
 
-        esquerda, direita = st.columns([1, 1.2])
+        esquerda, direita = st.columns(2)
         with esquerda:
-            st.markdown('<div class="section-heading">Pareceres da análise</div>', unsafe_allow_html=True)
-            por_status = df.groupby("status").size().reset_index(name="Cotações")
-            fig_status = px.pie(
-                por_status,
-                names="status",
-                values="Cotações",
-                hole=.68,
-                color="status",
-                color_discrete_map=CORES_STATUS,
-            )
-            fig_status.update_traces(
-                textposition="inside",
-                textinfo="percent",
-                hovertemplate="%{label}<br>%{value} cotações (%{percent})<extra></extra>",
-            )
-            aplicar_estilo_grafico(fig_status, 320)
-            fig_status.update_layout(showlegend=True, legend=dict(orientation="h", y=-.12))
-            st.plotly_chart(fig_status, width="stretch", config={"displayModeBar": False})
+            with st.container(border=True):
+                st.markdown('<div class="section-heading">📌 Distribuição dos Pareceres da IA Simbólica</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-note">Variável qualitativa nominal: decisões registradas pelo motor simbólico.</div>', unsafe_allow_html=True)
+                fig_status = px.pie(
+                    por_status,
+                    names="status",
+                    values="Simulações",
+                    hole=.66,
+                    color="status",
+                    color_discrete_map=CORES_STATUS,
+                )
+                fig_status.update_traces(
+                    textposition="inside",
+                    textinfo="percent",
+                    pull=[0.08 if status == "Aprovada" else 0 for status in por_status["status"]],
+                    hovertemplate="%{label}<br>%{value} simulações (%{percent})<extra></extra>",
+                )
+                fig_status.add_annotation(
+                    text=f"<b>{len(df):,}</b><br>Total", showarrow=False,
+                    font=dict(size=19, color=CORES["navy"]),
+                )
+                aplicar_estilo_grafico(fig_status, 335)
+                fig_status.update_layout(showlegend=True, legend=dict(orientation="v", x=.92, y=.5))
+                st.plotly_chart(fig_status, width="stretch", config={"displayModeBar": False})
         with direita:
-            st.markdown('<div class="section-heading">Cotações recentes</div>', unsafe_allow_html=True)
-            tabela_completa = formatar_tabela_cotacoes(df, ids_fechados)
-            busca_cotacao = st.text_input(
-                "Buscar cotação por cliente",
-                placeholder="Digite o nome do cliente",
-                key="busca_cotacao_dashboard",
-            )
-            if busca_cotacao.strip():
-                tabela_completa = tabela_completa[
-                    tabela_completa["Cliente"].str.contains(
-                        busca_cotacao.strip(), case=False, na=False
-                    )
-                ]
-            tabela = tabela_completa.head(100)
-            st.caption(
-                f"Exibindo as {len(tabela):,} cotações mais recentes de {len(tabela_completa):,} no filtro."
-            )
-            st.table(tabela)
-            csv = tabela_completa.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "Baixar cotações filtradas",
-                data=csv,
-                file_name=f"cotacoes_{data_inicio:%Y%m%d}_{data_fim:%Y%m%d}.csv",
+            with st.container(border=True):
+                st.markdown('<div class="section-heading">📊 Contagem de Ocorrências por Ramo / Categoria</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-note">Variável quantitativa discreta: frequência de simulações por ramo.</div>', unsafe_allow_html=True)
+                fig_ramos = px.bar(
+                    por_ramo.sort_values("Ramo"),
+                    x="Ramo",
+                    y="Simulações",
+                    text="Simulações",
+                    color_discrete_sequence=[CORES["brand"]],
+                )
+                fig_ramos.update_traces(textposition="outside", cliponaxis=False)
+                fig_ramos.update_yaxes(title="Frequência", rangemode="tozero")
+                fig_ramos.update_xaxes(title=None)
+                aplicar_estilo_grafico(fig_ramos, 335)
+                st.plotly_chart(fig_ramos, width="stretch", config={"displayModeBar": False})
+
+        bens_com_valor = df.loc[
+            (df["ramo"] != "saude") & df["valor_bem"].notna() & (df["valor_bem"] > 0)
+        ].copy()
+        premios_validos = df.loc[
+            ~df["status"].isin({"Recusada", "Não Coberto"})
+            & df["premio"].notna()
+            & (df["premio"] > 0)
+        ].copy()
+
+        esquerda, direita = st.columns(2)
+        with esquerda:
+            with st.container(border=True):
+                st.markdown('<div class="section-heading">〽 Análise Quantitativa Contínua</div>', unsafe_allow_html=True)
+                aba_histograma, aba_boxplot = st.tabs(["Histograma do Valor dos Bens", "Boxplot dos Prêmios"])
+                with aba_histograma:
+                    if bens_com_valor.empty:
+                        st.info("Não há valores positivos de bens ou capitais segurados para os filtros atuais.")
+                    else:
+                        media_bens = bens_com_valor["valor_bem"].mean()
+                        mediana_bens = bens_com_valor["valor_bem"].median()
+                        amplitude = bens_com_valor["valor_bem"].max() - bens_com_valor["valor_bem"].min()
+                        numero_faixas = max(1, math.ceil(amplitude / 20_000))
+                        fig_histograma = px.histogram(
+                            bens_com_valor,
+                            x="valor_bem",
+                            nbins=numero_faixas,
+                            labels={"valor_bem": "Valor do bem / capital segurado (R$)", "count": "Simulações"},
+                            color_discrete_sequence=[CORES["brand"]],
+                            hover_data={"cliente": True, "ramo": True, "valor_bem": ":,.2f"},
+                        )
+                        fig_histograma.update_traces(marker_line_color="#ffffff", marker_line_width=1)
+                        fig_histograma.add_vline(
+                            x=media_bens, line_dash="dash", line_color=CORES["orange"],
+                            annotation_text=f"Média {formatar_moeda(media_bens)}", annotation_position="top left",
+                        )
+                        fig_histograma.add_vline(
+                            x=mediana_bens, line_dash="dot", line_color=CORES["blue"],
+                            annotation_text=f"Mediana {formatar_moeda(mediana_bens)}", annotation_position="top right",
+                        )
+                        fig_histograma.update_xaxes(tickprefix="R$ ", tickformat=",.0f")
+                        fig_histograma.update_yaxes(title="Frequência", rangemode="tozero")
+                        aplicar_estilo_grafico(fig_histograma, 345)
+                        fig_histograma.update_layout(margin=dict(l=12, r=12, t=65, b=12), bargap=.05)
+                        st.plotly_chart(fig_histograma, width="stretch", config={"displayModeBar": False})
+                        st.caption("Faixas aproximadas de R$ 20 mil; Saúde é excluída por não possuir bem físico.")
+                with aba_boxplot:
+                    if premios_validos.empty:
+                        st.info("Não há prêmios positivos e não recusados para os filtros atuais.")
+                    else:
+                        premios_validos["Ramo"] = premios_validos["ramo"].map(RAMOS).fillna(premios_validos["ramo"])
+                        fig_box = px.box(
+                            premios_validos, x="Ramo", y="premio", color="Ramo", points="outliers",
+                            hover_data={"cliente": True, "status": True, "premio": ":,.2f"},
+                            labels={"premio": "Prêmio bruto calculado (R$)"},
+                            color_discrete_sequence=[CORES["brand"], CORES["blue"], CORES["purple"]],
+                        )
+                        fig_box.update_traces(boxmean=False, quartilemethod="linear")
+                        fig_box.update_yaxes(title="Prêmio bruto calculado (R$)", tickprefix="R$ ", tickformat=",.2f")
+                        aplicar_estilo_grafico(fig_box, 285)
+                        st.plotly_chart(fig_box, width="stretch", config={"displayModeBar": False})
+                        q1, q2, q3 = premios_validos["premio"].quantile([.25, .5, .75])
+                        coluna_q1, coluna_q2, coluna_q3 = st.columns(3)
+                        coluna_q1.metric("Q1", formatar_moeda(q1))
+                        coluna_q2.metric("Mediana (Q2)", formatar_moeda(q2))
+                        coluna_q3.metric("Q3", formatar_moeda(q3))
+
+        with direita:
+            with st.container(border=True):
+                st.markdown('<div class="section-heading">∑ Tabela de Frequências Acumuladas</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-note">Seção 8.2: distribuição de frequência dos valores segurados.</div>', unsafe_allow_html=True)
+                if bens_com_valor.empty:
+                    st.info("A tabela requer valores positivos de bens ou capitais segurados.")
+                    tabela_frequencia = pd.DataFrame()
+                else:
+                    minimo = int(bens_com_valor["valor_bem"].min() // 20_000) * 20_000
+                    maximo = (int(bens_com_valor["valor_bem"].max() // 20_000) + 1) * 20_000
+                    limites = list(range(minimo, maximo + 20_000, 20_000))
+                    faixas = pd.cut(bens_com_valor["valor_bem"], bins=limites, right=False, include_lowest=True)
+                    frequencia = faixas.value_counts(sort=False)
+                    tabela_frequencia = pd.DataFrame({"Faixa de Valor (R$)": frequencia.index.map(lambda faixa: f"{formatar_moeda(faixa.left)} – {formatar_moeda(faixa.right)}"), "Frequência (fi)": frequencia.values})
+                    tabela_frequencia["Frequência Acumulada (Fi)"] = tabela_frequencia["Frequência (fi)"].cumsum()
+                    tabela_frequencia["% Relativo (fri)"] = (tabela_frequencia["Frequência (fi)"] / len(bens_com_valor) * 100).map(lambda valor: f"{valor:.1f}%")
+                    tabela_frequencia["% Acumulado"] = (tabela_frequencia["Frequência (fi)"].cumsum() / len(bens_com_valor) * 100).map(lambda valor: f"{valor:.1f}%")
+                    st.dataframe(tabela_frequencia, hide_index=True, width="stretch", height=345)
+
+        with st.container(border=True):
+            st.markdown('<div class="section-heading">💡 Principais Insights</div>', unsafe_allow_html=True)
+            insight_1, insight_2, insight_3, insight_exportar = st.columns([1.2, 1.1, 1.1, .9])
+            if bens_com_valor.empty:
+                texto_concentracao = "Não há valores de bens suficientes para indicar uma faixa predominante."
+            else:
+                faixa_principal = tabela_frequencia.loc[tabela_frequencia["Frequência (fi)"].idxmax(), "Faixa de Valor (R$)"]
+                texto_concentracao = f"Maior concentração de propostas: {faixa_principal}."
+            insight_1.markdown(f"**Distribuição**  \n{texto_concentracao}")
+            insight_2.markdown(f"**IA Simbólica**  \n{taxa_aprovacao_ia:.1f}% dos pareceres estão aprovados.")
+            insight_3.markdown(f"**LGPD Art. 20**  \n{percentual_auditavel:.1f}% das decisões têm trilha explicável." if percentual_auditavel is not None else "**LGPD Art. 20**  \nSem registros no filtro.")
+            tabela_exportacao = formatar_tabela_cotacoes(df, ids_fechados)
+            insight_exportar.download_button(
+                "Exportar relatório CSV",
+                data=tabela_exportacao.to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"relatorio_cotacoes_{data_inicio:%Y%m%d}_{data_fim:%Y%m%d}.csv",
                 mime="text/csv",
                 icon=":material/download:",
+                width="stretch",
             )
 
 with tab_carteira:
@@ -877,6 +909,11 @@ with tab_carteira:
         unsafe_allow_html=True,
     )
     st.metric("Comissão anual registrada na carteira", formatar_moeda(comissao_anual))
+    st.metric(
+        "Comissão Mensal Estimada",
+        formatar_moeda(comissao_anual / 12),
+        help="Estimativa mensal calculada pela comissão anual das apólices vigentes dividida por 12.",
+    )
     comissao_por_ramo = pd.DataFrame(dados_relacionais["comissoes_por_ramo"])
     comissao_por_seguradora = pd.DataFrame(dados_relacionais["comissoes_por_seguradora"])
     esquerda, direita = st.columns(2)

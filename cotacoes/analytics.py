@@ -38,7 +38,8 @@ def gerar_comissoes_demonstracao(data_atual: date, quantidade_meses: int = 24):
     inicio = date(data_atual.year, data_atual.month, 1)
     for deslocamento in range(quantidade_meses - 1, -1, -1):
         mes = deslocar_mes(inicio, -deslocamento)
-        total = Decimal(str(gerador.randint(600000, 1200000) / 100))
+        # A 75% líquido, mantém a faixa mensal demonstrativa entre R$ 5,5 mil e R$ 11 mil.
+        total = Decimal(str(gerador.randint(733400, 1466667) / 100))
         percentual_auto = Decimal(str(gerador.randint(25, 40) / 100))
         percentual_vida = Decimal(str(gerador.randint(20, 35) / 100))
         valores = [

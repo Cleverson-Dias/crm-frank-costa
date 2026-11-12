@@ -54,8 +54,8 @@ class SeguradoraAdmin(admin.ModelAdmin):
 
 @admin.register(Plano)
 class PlanoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "seguradora", "tipo", "tipo_seguro", "comissao_efetiva", "ativo")
-    list_filter = ("tipo", "tipo_seguro", "ativo", "seguradora")
+    list_display = ("nome", "seguradora", "tipo", "tipo_seguro", "segmentacao_assistencial", "comissao_efetiva", "ativo")
+    list_filter = ("tipo", "tipo_seguro", "segmentacao_assistencial", "ativo", "seguradora")
     search_fields = ("nome", "seguradora__nome")
 
 

@@ -196,6 +196,27 @@ class Plano(models.Model):
     tipo_seguro = models.CharField(max_length=40, choices=Bem.TIPO_CHOICES)
     nome = models.CharField(max_length=150)
     cobertura_descricao = models.TextField(blank=True)
+    SEGMENTACAO_ASSISTENCIAL_CHOICES = [
+        ("ambulatorial", "Ambulatorial"),
+        ("hospitalar", "Hospitalar sem obstetrícia"),
+        ("hospitalar_obstetricia", "Hospitalar com obstetrícia"),
+        ("odontologico", "Exclusivamente odontológico"),
+        ("referencia", "Referência"),
+        ("ambulatorial_odontologico", "Ambulatorial + odontológico"),
+        ("ambulatorial_hospitalar", "Ambulatorial + hospitalar sem obstetrícia"),
+        ("ambulatorial_hospitalar_obstetricia", "Ambulatorial + hospitalar com obstetrícia"),
+        ("hospitalar_obstetricia_odontologico", "Hospitalar com obstetrícia + odontológico"),
+        ("hospitalar_odontologico", "Hospitalar sem obstetrícia + odontológico"),
+        ("ambulatorial_hospitalar_odontologico", "Ambulatorial + hospitalar sem obstetrícia + odontológico"),
+        ("ambulatorial_hospitalar_obstetricia_odontologico", "Ambulatorial + hospitalar com obstetrícia + odontológico"),
+    ]
+    segmentacao_assistencial = models.CharField(
+        max_length=64,
+        choices=SEGMENTACAO_ASSISTENCIAL_CHOICES,
+        blank=True,
+        default="",
+        help_text="Segmentação assistencial declarada no produto/contrato.",
+    )
     percentual_comissao = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
         help_text="Percentual contratado; deixe em branco quando ainda não for conhecido.",

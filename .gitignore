@@ -6,6 +6,9 @@ env/
 __pycache__/
 *.pyc
 
+# Logs locais de execução
+*.log
+
 # Banco de dados local (cada um vai ter o seu)
 db.sqlite3
 

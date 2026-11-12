@@ -149,7 +149,7 @@ python manage.py popular_dados --limpar
 python manage.py runserver
 
 # 9. Em outro terminal, iniciar o painel analítico
-streamlit run app_analytics.py
+python -m streamlit run app_analytics.py
 ```
 
 Acesse `http://127.0.0.1:8000/` e o painel Streamlit em `http://localhost:8501/`.
@@ -161,8 +161,6 @@ Acesse `http://127.0.0.1:8000/` e o painel Streamlit em `http://localhost:8501/`
 O comando `popular_dados` gera, a cada execução, 50 clientes, 50 apólices ativas e 50 cotações adicionais não fechadas, desde que existam planos ativos e percentuais de comissão confirmados para automóvel, vida e saúde. O mix ativo é uma premissa sintética de demonstração: 30 apólices de automóvel, 10 de vida e 10 de saúde. Também cria 48 decisões de renovação distribuídas pelos últimos 24 meses e valores mensais demonstrativos para automóvel, vida e saúde ao longo do mesmo período. O comando não cria seguradoras, identificadores, produtos, coberturas ou percentuais presumidos.
 
 As comissões da carteira são calculadas a partir do percentual cadastrado nos planos. Separadamente, o cenário demonstrativo gera de R$ 6 mil a R$ 12 mil de comissão bruta mensal, com margem líquida acadêmica estimada em 75%. São valores fictícios e não representam dados contábeis nem percentuais reais garantidos pelas seguradoras. A tabela de comissão mensal requer a migração do modelo demonstrativo.
-
-O gerador não reproduz mais a tabela estatística antiga de 50 cotações exclusivamente de automóvel: a seção 8 do relatório e os slides devem ser revisados separadamente para refletir o novo mix, pois os arquivos-fonte desses documentos não fazem parte deste repositório.
 
 A opção `--limpar` remove clientes e apólices identificados como sintéticos, as cotações marcadas como demonstração e a série de comissões demonstrativas; registros sem essa identificação são preservados. Antes de usá-la em uma base que já contenha dados, confirme que somente os registros demonstrativos desejados estão marcados.
 

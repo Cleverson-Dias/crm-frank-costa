@@ -109,7 +109,7 @@ class Command(BaseCommand):
                 parecer = motor_ia.avaliar_elegibilidade(perfil)
                 fator_risco = motor_ia.fator_risco_por_perfil(perfil, parecer)
                 resultado = motor_ia.calcular_proposta(
-                    ramo, perfil["valor_bem"], fator_risco
+                    ramo, perfil["valor_bem"], fator_risco, idade=perfil.get("idade")
                 )
                 cotacao_id = nosql.salvar_cotacao(
                     cliente_id=cliente.id,
@@ -149,7 +149,7 @@ class Command(BaseCommand):
                 parecer = motor_ia.avaliar_elegibilidade(perfil)
                 fator_risco = motor_ia.fator_risco_por_perfil(perfil, parecer)
                 resultado = motor_ia.calcular_proposta(
-                    ramo, perfil["valor_bem"], fator_risco
+                    ramo, perfil["valor_bem"], fator_risco, idade=perfil.get("idade")
                 )
                 nosql.salvar_cotacao(
                     cliente_id=cliente.id,
@@ -202,7 +202,7 @@ class Command(BaseCommand):
                 "uso_veiculo": "passeio",
             }
         if ramo == "vida":
-            capital = premio / motor_ia.TAXA_BASE[ramo]
+            capital = premio / motor_ia.taxa_referencia_vida(40)
             return {
                 "tipo_seguro": ramo,
                 "idade": 40,

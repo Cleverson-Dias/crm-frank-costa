@@ -125,16 +125,22 @@ def montar_perfil_cotacao(dados, tipo_seguro, ano_atual=None):
 
     try:
         idade = int(dados.get("idade", ""))
-        valor_informado = Decimal(dados.get("valor_bem", ""))
-    except (InvalidOperation, TypeError, ValueError) as erro:
-        raise ValueError("Informe uma idade e um valor válidos para a cotação.") from erro
-
-    if idade < 0 or idade > 120 or not valor_informado.is_finite() or valor_informado <= 0:
-        raise ValueError("Confira a idade e o valor informado.")
-    if valor_informado > Decimal("9999999999.99"):
-        raise ValueError("O valor informado excede o limite aceito para esta cotação.")
+    except (TypeError, ValueError) as erro:
+        raise ValueError("Informe uma idade válida para a cotação.") from erro
+    if idade < 0 or idade > 120:
+        raise ValueError("Confira a idade informada.")
 
     perfil = {"idade": idade, "tipo_seguro": tipo_seguro}
+    valor_informado = None
+    if tipo_seguro != "saude" or (dados.get("possui_contrato") == "sim" and dados.get("valor_bem")):
+        try:
+            valor_informado = Decimal(dados.get("valor_bem", ""))
+        except (InvalidOperation, TypeError, ValueError) as erro:
+            raise ValueError("Informe um valor válido para a cotação.") from erro
+        if not valor_informado.is_finite() or valor_informado <= 0:
+            raise ValueError("Confira o valor informado.")
+        if valor_informado > Decimal("9999999999.99"):
+            raise ValueError("O valor informado excede o limite aceito para esta cotação.")
     if tipo_seguro == "auto":
         marca = dados.get("marca_veiculo", "").strip()
         modelo = dados.get("modelo_veiculo", "").strip()
@@ -201,39 +207,72 @@ def montar_perfil_cotacao(dados, tipo_seguro, ano_atual=None):
         })
         return perfil, valor_informado, valor_informado, "Capital segurado"
 
-    try:
-        dias_contrato = int(dados.get("dias_contrato", ""))
-    except (TypeError, ValueError) as erro:
-        raise ValueError("Informe os dias desde o início do contrato de saúde.") from erro
+    possui_contrato = dados.get("possui_contrato")
+    if possui_contrato not in {"sim", "nao"}:
+        raise ValueError("Informe se existe plano de saúde vigente.")
     segmentacao = dados.get("segmentacao_contratada", "")
-    tipo_atendimento = dados.get("tipo_atendimento", "")
     cobertura = dados.get("cobertura_exigida", "")
-    if segmentacao not in {"ambulatorial", "hospitalar", "hospitalar_obstetricia", "referencia"}:
+    if segmentacao not in {
+        "ambulatorial",
+        "hospitalar",
+        "hospitalar_obstetricia",
+        "odontologico",
+        "ambulatorial_odontologico",
+        "ambulatorial_hospitalar",
+        "ambulatorial_hospitalar_obstetricia",
+        "hospitalar_obstetricia_odontologico",
+        "hospitalar_odontologico",
+        "ambulatorial_hospitalar_odontologico",
+        "ambulatorial_hospitalar_obstetricia_odontologico",
+        "referencia",
+    }:
         raise ValueError("Selecione uma segmentação válida para o plano de saúde.")
-    if tipo_atendimento not in {"demais", "urgencia_emergencia", "parto"}:
-        raise ValueError("Selecione um tipo de atendimento válido.")
-    if cobertura not in {"ambulatorial", "hospitalar", "obstetricia"}:
+    if cobertura not in {"ambulatorial", "hospitalar", "obstetricia", "odontologica"}:
         raise ValueError("Selecione uma cobertura válida.")
-    if dias_contrato < 0:
-        raise ValueError("Os dias de contrato não podem ser negativos.")
-
-    valor_anualizado = valor_informado * 12
-    if valor_anualizado > Decimal("9999999999.99"):
-        raise ValueError("O valor informado excede o limite aceito para esta cotação.")
     perfil.update({
-        "valor_bem": float(valor_anualizado),
-        "operacao": "atendimento",
+        "possui_contrato": possui_contrato == "sim",
         "segmentacao_contratada": segmentacao,
+        "cobertura_exigida": cobertura,
+    })
+    if possui_contrato == "nao":
+        tipo_contratacao = dados.get("tipo_contratacao", "")
+        if tipo_contratacao not in {"individual_familiar", "coletivo_empresarial", "coletivo_adesao"}:
+            raise ValueError("Selecione a modalidade da nova contratação.")
+        try:
+            quantidade_vidas = int(dados.get("quantidade_vidas_nova", ""))
+        except (TypeError, ValueError) as erro:
+            raise ValueError("Informe a quantidade de vidas da nova contratação.") from erro
+        if quantidade_vidas < 1:
+            raise ValueError("A quantidade de vidas deve ser pelo menos 1.")
+        perfil.update({"operacao": "nova_contratacao", "tipo_contratacao": tipo_contratacao,
+                       "quantidade_vidas": quantidade_vidas, "valor_bem": None})
+        return perfil, None, None, "Nova contratação de plano de saúde"
+
+    data_inicio = parse_date(dados.get("data_inicio_contrato", ""))
+    tipo_atendimento = dados.get("tipo_atendimento", "")
+    if data_inicio is None or data_inicio > date.today():
+        raise ValueError("Informe uma data de início válida, que não seja futura.")
+    if tipo_atendimento not in {"demais", "urgencia_emergencia", "parto"}:
+        raise ValueError("Selecione o tipo de atendimento a analisar.")
+    premio_anual_estimado = valor_informado * 12 if valor_informado is not None else None
+    if premio_anual_estimado is not None and premio_anual_estimado > Decimal("9999999999.99"):
+        raise ValueError("O valor informado excede o limite aceito para esta cotação.")
+    dias_contrato = (date.today() - data_inicio).days
+    perfil.update({
+        "valor_bem": None,
+        "mensalidade_mensal": float(valor_informado) if valor_informado is not None else None,
+        "premio_anual_estimado": float(premio_anual_estimado) if premio_anual_estimado is not None else None,
+        "operacao": "atendimento",
         "tipo_atendimento": tipo_atendimento,
         "dias_contrato": dias_contrato,
-        "cobertura_exigida": cobertura,
+        "data_inicio_contrato": data_inicio.isoformat(),
         "no_rol_ans": dados.get("no_rol_ans") == "on",
         "dentro_abrangencia": dados.get("dentro_abrangencia") == "on",
         "dlp_declarada": dados.get("dlp_declarada") == "on",
         "relacionado_dlp": dados.get("relacionado_dlp") == "on",
         "alta_complexidade": dados.get("alta_complexidade") == "on",
     })
-    return perfil, valor_anualizado, valor_informado, "Plano de saúde"
+    return perfil, None, valor_informado, "Plano de saúde"
 
 
 def contexto_formulario_cotacao(request):
@@ -378,12 +417,19 @@ def criar_cotacao_manual_pj(request):
             for mensagem in mensagens_campo:
                 messages.error(request, mensagem)
         return render(request, "cotacoes/cotacao_form.html", formulario)
+    resultado_calculo = (
+        motor_ia.calcular_proposta("saude", None, 1.0)
+        if tipo_seguro == "saude"
+        else {}
+    )
+    if tipo_seguro == "saude":
+        resultado_calculo["mensagem"] = "Aguardando cotação da seguradora."
     cotacao_id = nosql.salvar_cotacao(
         cliente_id=cliente.id,
         bem_id=bem.id,
         tipo_seguro=tipo_seguro,
         dados=dados,
-        resultado_calculo={},
+        resultado_calculo=resultado_calculo,
         parecer_ia={"status": "Aguardando cotação da seguradora"},
     )
     cotacao.cotacao_mongo_id = str(cotacao_id)
@@ -491,6 +537,18 @@ def nova_cotacao(request):
                 contexto_formulario_cotacao(request),
             )
         seguradora = plano.seguradora
+        segmentacao_plano = plano.segmentacao_assistencial
+        segmentacao_informada = perfil.get("segmentacao_contratada")
+        if tipo_seguro == "saude" and segmentacao_plano and segmentacao_informada != segmentacao_plano:
+            messages.error(
+                request,
+                "A segmentaÃ§Ã£o selecionada nÃ£o corresponde Ã  cadastrada para este plano. Confira o contrato.",
+            )
+            return render(
+                request,
+                "cotacoes/cotacao_form.html",
+                contexto_formulario_cotacao(request),
+            )
         if (
             tipo_seguro == "saude"
             and "bradesco" in seguradora.nome.casefold()
@@ -558,23 +616,40 @@ def nova_cotacao(request):
 
     # 2) Motor de cálculo usa o parecer para ajustar o prêmio (RF03)
     fator_risco = motor_ia.fator_risco_por_perfil(perfil, parecer)
-    resultado_calculo = motor_ia.calcular_proposta(tipo_seguro, valor_bem, fator_risco)
+    if perfil.get("operacao") == "nova_contratacao":
+        resultado_calculo = motor_ia.calcular_proposta(tipo_seguro, None, fator_risco)
+        resultado_calculo["mensagem"] = "Aguardando cotação da operadora."
+    elif tipo_seguro == "saude":
+        resultado_calculo = motor_ia.calcular_proposta(
+            tipo_seguro,
+            valor_informado,
+            fator_risco,
+            periodicidade="mensal",
+        )
+        if valor_informado is None:
+            resultado_calculo["mensagem"] = "Valor da mensalidade não informado."
+    elif valor_bem is None:
+        resultado_calculo = motor_ia.calcular_proposta(tipo_seguro, None, fator_risco)
+        resultado_calculo["mensagem"] = "Valor não informado."
+    else:
+        resultado_calculo = motor_ia.calcular_proposta(
+            tipo_seguro, valor_bem, fator_risco, idade=perfil.get("idade")
+        )
 
     # 3) Persiste a cotação completa no Mongo, schema-less (RF02)
     cotacao_id = nosql.salvar_cotacao(
         cliente_id=cliente.id,
         bem_id=bem.id,
         tipo_seguro=tipo_seguro,
-        dados={**perfil, "valor_informado": float(valor_informado)},
+        dados={**perfil, "valor_informado": float(valor_informado) if valor_informado is not None else None},
         resultado_calculo=resultado_calculo,
         parecer_ia=parecer,
     )
     tipo = get_object_or_404(TipoSeguro, codigo=tipo_seguro, ativo=True)
-    status = (
-        "aprovada"
-        if parecer["status"] in PARECERES_FAVORAVEIS
-        else "recusada"
-    )
+    if perfil.get("operacao") == "nova_contratacao":
+        status = "aguardando"
+    else:
+        status = "aprovada" if parecer["status"] in PARECERES_FAVORAVEIS else "recusada"
     Cotacao.objects.create(
         cliente=cliente,
         tipo_seguro=tipo,
@@ -586,7 +661,7 @@ def nova_cotacao(request):
         or resultado_calculo.get("premio"),
         valor_franquia=resultado_calculo.get("franquia"),
         percentual_comissao=plano.comissao_efetiva() if plano else None,
-        dados_especificos={**perfil, "valor_informado": float(valor_informado)},
+        dados_especificos={**perfil, "valor_informado": float(valor_informado) if valor_informado is not None else None},
         cotacao_mongo_id=str(cotacao_id),
     )
 
@@ -594,7 +669,8 @@ def nova_cotacao(request):
         "cliente": cliente,
         "bem": bem,
         "tipo_seguro": tipo_seguro,
-        "pode_fechar": parecer["status"] not in {
+        "operacao": perfil.get("operacao"),
+        "pode_fechar": perfil.get("operacao") != "nova_contratacao" and parecer["status"] not in {
             "Recusada",
             "Não Coberto",
             "Pendência de Dados",
@@ -602,6 +678,7 @@ def nova_cotacao(request):
         },
         "parecer": parecer,
         "resultado_calculo": resultado_calculo,
+        "exibe_estimativa": resultado_calculo.get("premio") is not None,
         "cotacao_id": cotacao_id,
     }
     return render(request, "cotacoes/cotacao_resultado.html", contexto)
@@ -836,5 +913,6 @@ def dashboard(request):
         "cotacoes_recentes": recentes,
         "apolices_ativas_count": apolices_ativas.count(),
         "comissao_realizada": round(comissao_realizada, 2),
+        "comissao_mensal_estimada": round(comissao_realizada / 12, 2),
     }
     return render(request, "cotacoes/dashboard.html", contexto)

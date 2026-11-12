@@ -26,6 +26,7 @@
             </div>
 
             <!-- Valores calculados -->
+            {% if exibe_estimativa %}
             <div class="card-app">
                 <h6 class="fw-bold text-muted mb-3 small text-uppercase">Estimativa de Valores</h6>
                 <div class="d-flex justify-content-between mb-2">
@@ -49,6 +50,12 @@
                 </p>
                 {% endif %}
             </div>
+            {% elif operacao == "nova_contratacao" %}
+            <div class="card-app">
+                <h6 class="fw-bold text-muted mb-3 small text-uppercase">Próxima etapa</h6>
+                <p class="mb-0">A cotação foi registrada e aguarda preço e condições da operadora. Nenhum valor de mensalidade foi estimado.</p>
+            </div>
+            {% endif %}
 
             <div class="d-flex gap-3 mt-4">
                 <a href="{% url 'nova_cotacao' %}" class="btn btn-outline-custom">Nova Simulação</a>

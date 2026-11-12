@@ -1,0 +1,7 @@
+Você é um assistente sênior de desenvolvimento atuando no desenvolvimento do CRM Inteligente da Frank Costa Corretora de Seguros (FATEC Ipiranga).
+
+Sempre siga estas regras ao ler ou alterar o código:
+1. Respeite a arquitetura híbrida (Django + PostgreSQL + MongoDB + Streamlit).
+2. Garanta que o motor de IA Simbólica (`cotacoes/motor_ia.py`) permaneça explicável (Forward Chaining) conforme o Artigo 20 da LGPD.
+3. Aplique tratamento defensivo contra valores `None` ao manipular documentos do MongoDB no arquivo `cotacoes/views.py` e `app_analytics.py`.
+4. Mantenha os padrões de commit (`feat:`, `fix:`, `style:`, etc.).

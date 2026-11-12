@@ -48,6 +48,7 @@
                                     value="{{ plano.id }}"
                                     data-tipo="{{ plano.tipo_seguro }}"
                                     data-seguradora="{{ plano.seguradora_id }}"
+                                    data-segmentacao="{{ plano.segmentacao_assistencial }}"
                                     data-detalhes="{{ plano.modalidade }} · {{ plano.acomodacao }} · {{ plano.coparticipacao }} · {{ plano.cobertura_descricao }}"
                                     {% if form_data.plano_id == plano.id|stringformat:"s" %}selected{% endif %}
                                 >{{ plano.seguradora.nome }} — {{ plano.nome }}{% if plano.modalidade %} · {{ plano.modalidade }}{% endif %}{% if plano.acomodacao %} · {{ plano.acomodacao }}{% endif %}</option>
@@ -139,7 +140,8 @@
                         <div class="col-md-4">
                             <label class="form-label small fw-semibold">Uso principal</label>
                             <select name="uso_veiculo" class="form-select" data-obrigatorio>
-                                <option value="passeio" {% if form_data.uso_veiculo == "passeio" or not form_data.uso_veiculo %}selected{% endif %}>Lazer / Passeio</option>
+                                <option value="" {% if not form_data.uso_veiculo %}selected{% endif %}>Selecione o uso principal</option>
+                                <option value="passeio" {% if form_data.uso_veiculo == "passeio" %}selected{% endif %}>Lazer / Passeio</option>
                                 <option value="trabalho" {% if form_data.uso_veiculo == "trabalho" %}selected{% endif %}>Trabalho / Aplicativo</option>
                                 <option value="carga" {% if form_data.uso_veiculo == "carga" %}selected{% endif %}>Comercial / Transporte de carga</option>
                             </select>
@@ -151,7 +153,8 @@
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Sinistros nos últimos 3 anos</label>
                             <select name="sinistros_ultimos_3_anos" class="form-select" data-obrigatorio>
-                                <option value="0" {% if form_data.sinistros_ultimos_3_anos == "0" or not form_data.sinistros_ultimos_3_anos %}selected{% endif %}>Nenhum</option>
+                                <option value="" {% if not form_data.sinistros_ultimos_3_anos %}selected{% endif %}>Selecione a quantidade</option>
+                                <option value="0" {% if form_data.sinistros_ultimos_3_anos == "0" %}selected{% endif %}>Nenhum</option>
                                 <option value="1" {% if form_data.sinistros_ultimos_3_anos == "1" %}selected{% endif %}>1 sinistro</option>
                                 <option value="2" {% if form_data.sinistros_ultimos_3_anos == "2" %}selected{% endif %}>2 sinistros</option>
                                 <option value="3" {% if form_data.sinistros_ultimos_3_anos == "3" %}selected{% endif %}>3 ou mais</option>
@@ -177,11 +180,11 @@
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">Declaração Pessoal de Saúde completa</label>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dps_completa" class="form-check-input" {% if not form_data or form_data.dps_completa == "on" %}checked{% endif %}>
+                                    <input type="checkbox" name="dps_completa" class="form-check-input" {% if form_data.dps_completa == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Sim, dados declarados para esta simulação</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dps_compativel" class="form-check-input" {% if not form_data or form_data.dps_compativel == "on" %}checked{% endif %}>
+                                    <input type="checkbox" name="dps_compativel" class="form-check-input" {% if form_data.dps_compativel == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Informações compatíveis com a proposta</label>
                                 </div>
                             </div>
@@ -219,51 +222,86 @@
                     </div>
                     <div class="row g-3 mb-4" data-ramo="saude" hidden>
                         <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Possui plano de saúde vigente?</label>
+                            <select name="possui_contrato" id="possui-contrato" class="form-select" data-obrigatorio>
+                                <option value="">Selecione</option>
+                                <option value="sim" {% if form_data.possui_contrato == "sim" %}selected{% endif %}>Sim</option>
+                                <option value="nao" {% if form_data.possui_contrato == "nao" %}selected{% endif %}>Não, será uma nova contratação</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" data-saude-contrato="sim" hidden>
                             <label class="form-label small fw-semibold">Mensalidade estimada do plano (R$)</label>
-                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex.: 850" min="0.01" step="0.01" value="{% if form_data.tipo_seguro == 'saude' %}{{ form_data.valor_bem|default:'' }}{% endif %}" data-obrigatorio>
-                            <span class="form-text">Informe o valor mensal para estimar a mensalidade anualizada.</span>
+                            <input type="number" name="valor_bem" class="form-control" placeholder="Ex.: 850" min="0.01" step="0.01" value="{% if form_data.tipo_seguro == 'saude' %}{{ form_data.valor_bem|default:'' }}{% endif %}">
+                            <span class="form-text">Opcional para análise de cobertura; use o valor atual se souber.</span>
+                        </div>
+                        <div class="col-md-6" data-saude-contrato="sim" hidden>
+                            <label class="form-label small fw-semibold">Início da vigência do plano</label>
+                            <input type="date" id="data-inicio-contrato" name="data_inicio_contrato" class="form-control" value="{{ form_data.data_inicio_contrato|default:'' }}" data-obrigatorio>
+                            <span id="dias-vigencia" class="form-text">Os dias de vigência serão calculados automaticamente.</span>
+                        </div>
+                        <div class="col-md-6" data-saude-contrato="nao" hidden>
+                            <label class="form-label small fw-semibold">Modalidade pretendida</label>
+                            <select name="tipo_contratacao" class="form-select" data-obrigatorio>
+                                <option value="">Selecione</option>
+                                <option value="individual_familiar" {% if form_data.tipo_contratacao == "individual_familiar" %}selected{% endif %}>Individual ou familiar</option>
+                                <option value="coletivo_empresarial" {% if form_data.tipo_contratacao == "coletivo_empresarial" %}selected{% endif %}>Coletivo empresarial</option>
+                                <option value="coletivo_adesao" {% if form_data.tipo_contratacao == "coletivo_adesao" %}selected{% endif %}>Coletivo por adesão</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" data-saude-contrato="nao" hidden>
+                            <label class="form-label small fw-semibold">Quantidade de vidas</label>
+                            <input type="number" name="quantidade_vidas_nova" min="1" class="form-control" value="{{ form_data.quantidade_vidas_nova|default:'1' }}" data-obrigatorio>
                         </div>
                         <div class="col-12 row g-3">
-                            <div class="col-md-6">
+                            <div class="col-md-6" data-saude-contrato="ambos">
                                 <label class="form-label small fw-semibold">Segmentação contratada</label>
-                                <select name="segmentacao_contratada" class="form-select" data-obrigatorio>
-                                    <option value="ambulatorial" {% if form_data.segmentacao_contratada == "ambulatorial" or not form_data.segmentacao_contratada %}selected{% endif %}>Ambulatorial</option>
-                                    <option value="hospitalar" {% if form_data.segmentacao_contratada == "hospitalar" %}selected{% endif %}>Hospitalar</option>
+                                <select name="segmentacao_contratada" id="segmentacao-contratada" class="form-select" data-obrigatorio>
+                                    <option value="" {% if not form_data.segmentacao_contratada %}selected{% endif %}>Selecione conforme o contrato</option>
+                                    <option value="ambulatorial" {% if form_data.segmentacao_contratada == "ambulatorial" %}selected{% endif %}>Ambulatorial</option>
+                                    <option value="hospitalar" {% if form_data.segmentacao_contratada == "hospitalar" %}selected{% endif %}>Hospitalar sem obstetrícia</option>
                                     <option value="hospitalar_obstetricia" {% if form_data.segmentacao_contratada == "hospitalar_obstetricia" %}selected{% endif %}>Hospitalar com obstetrícia</option>
+                                    <option value="odontologico" {% if form_data.segmentacao_contratada == "odontologico" %}selected{% endif %}>Exclusivamente odontológico</option>
                                     <option value="referencia" {% if form_data.segmentacao_contratada == "referencia" %}selected{% endif %}>Referência</option>
+                                    <option value="ambulatorial_odontologico" {% if form_data.segmentacao_contratada == "ambulatorial_odontologico" %}selected{% endif %}>Ambulatorial + odontológico</option>
+                                    <option value="ambulatorial_hospitalar" {% if form_data.segmentacao_contratada == "ambulatorial_hospitalar" %}selected{% endif %}>Ambulatorial + hospitalar sem obstetrícia</option>
+                                    <option value="ambulatorial_hospitalar_obstetricia" {% if form_data.segmentacao_contratada == "ambulatorial_hospitalar_obstetricia" %}selected{% endif %}>Ambulatorial + hospitalar com obstetrícia</option>
+                                    <option value="hospitalar_obstetricia_odontologico" {% if form_data.segmentacao_contratada == "hospitalar_obstetricia_odontologico" %}selected{% endif %}>Hospitalar com obstetrícia + odontológico</option>
+                                    <option value="hospitalar_odontologico" {% if form_data.segmentacao_contratada == "hospitalar_odontologico" %}selected{% endif %}>Hospitalar sem obstetrícia + odontológico</option>
+                                    <option value="ambulatorial_hospitalar_odontologico" {% if form_data.segmentacao_contratada == "ambulatorial_hospitalar_odontologico" %}selected{% endif %}>Ambulatorial + hospitalar sem obstetrícia + odontológico</option>
+                                    <option value="ambulatorial_hospitalar_obstetricia_odontologico" {% if form_data.segmentacao_contratada == "ambulatorial_hospitalar_obstetricia_odontologico" %}selected{% endif %}>Ambulatorial + hospitalar com obstetrícia + odontológico</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold">Tipo de atendimento</label>
+                            <div class="col-md-6" data-saude-contrato="sim" hidden>
+                                <label class="form-label small fw-semibold">Situação analisada (uma por vez)</label>
                                 <select name="tipo_atendimento" class="form-select" data-obrigatorio>
-                                    <option value="demais" {% if form_data.tipo_atendimento == "demais" or not form_data.tipo_atendimento %}selected{% endif %}>Demais procedimentos</option>
+                                    <option value="" {% if not form_data.tipo_atendimento %}selected{% endif %}>Selecione o tipo de atendimento</option>
+                                    <option value="demais" {% if form_data.tipo_atendimento == "demais" %}selected{% endif %}>Demais procedimentos</option>
                                     <option value="urgencia_emergencia" {% if form_data.tipo_atendimento == "urgencia_emergencia" %}selected{% endif %}>Urgência / emergência</option>
-                                    <option value="parto" {% if form_data.tipo_atendimento == "parto" %}selected{% endif %}>Parto</option>
+                                    <option value="parto" {% if form_data.tipo_atendimento == "parto" %}selected{% endif %}>Parto a termo</option>
                                 </select>
+                                <span class="form-text">A análise considera uma situação por vez, pois cada uma pode ter regra de carência diferente. Complicações gestacionais devem ser avaliadas como urgência/emergência.</span>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold">Dias desde o início do contrato</label>
-                                <input type="number" name="dias_contrato" class="form-control" min="0" value="{{ form_data.dias_contrato|default:'365' }}" data-obrigatorio>
-                            </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" data-saude-contrato="ambos">
                                 <label class="form-label small fw-semibold">Cobertura exigida</label>
-                                <select name="cobertura_exigida" class="form-select">
-                                    <option value="ambulatorial" {% if form_data.cobertura_exigida == "ambulatorial" or not form_data.cobertura_exigida %}selected{% endif %}>Ambulatorial</option>
+                                <select name="cobertura_exigida" class="form-select" data-obrigatorio>
+                                    <option value="" {% if not form_data.cobertura_exigida %}selected{% endif %}>Selecione a cobertura necessária</option>
+                                    <option value="ambulatorial" {% if form_data.cobertura_exigida == "ambulatorial" %}selected{% endif %}>Ambulatorial</option>
                                     <option value="hospitalar" {% if form_data.cobertura_exigida == "hospitalar" %}selected{% endif %}>Hospitalar</option>
                                     <option value="obstetricia" {% if form_data.cobertura_exigida == "obstetricia" %}selected{% endif %}>Obstetrícia</option>
+                                    <option value="odontologica" {% if form_data.cobertura_exigida == "odontologica" %}selected{% endif %}>Odontológica</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" data-saude-contrato="sim" hidden>
                                 <div class="form-check">
-                                    <input type="checkbox" name="no_rol_ans" class="form-check-input" {% if not form_data or form_data.no_rol_ans == "on" %}checked{% endif %}>
-                                    <label class="form-check-label">Procedimento previsto no Rol da ANS</label>
+                                    <input type="checkbox" name="no_rol_ans" class="form-check-input" {% if form_data.no_rol_ans == "on" %}checked{% endif %}>
+                                    <label class="form-check-label">Confirmei que o procedimento consta no Rol da ANS</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" name="dentro_abrangencia" class="form-check-input" {% if not form_data or form_data.dentro_abrangencia == "on" %}checked{% endif %}>
-                                    <label class="form-check-label">Atendimento dentro da abrangência</label>
+                                    <input type="checkbox" name="dentro_abrangencia" class="form-check-input" {% if form_data.dentro_abrangencia == "on" %}checked{% endif %}>
+                                    <label class="form-check-label">Confirmei que o atendimento está na abrangência do plano</label>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" data-saude-contrato="sim" hidden>
                                 <div class="form-check">
                                     <input type="checkbox" name="dlp_declarada" class="form-check-input" {% if form_data.dlp_declarada == "on" %}checked{% endif %}>
                                     <label class="form-check-label">Doença ou lesão preexistente declarada</label>
@@ -306,6 +344,10 @@
     const seguradoraSelect = document.getElementById("seguradora");
     const planoSelect = document.getElementById("plano");
     const planoDetalhes = document.getElementById("plano-detalhes");
+    const segmentacaoSelect = document.getElementById("segmentacao-contratada");
+    const possuiContrato = document.getElementById("possui-contrato");
+    const dataInicioContrato = document.getElementById("data-inicio-contrato");
+    const diasVigencia = document.getElementById("dias-vigencia");
     const configuracoes = {
         auto: "Idade do condutor principal",
         vida: "Idade da pessoa segurada",
@@ -321,6 +363,16 @@
 
         document.querySelectorAll("[data-ramo]").forEach((grupo) => {
             const ativo = ehPessoaFisica && grupo.dataset.ramo === ramo;
+            grupo.hidden = !ativo;
+            grupo.querySelectorAll("input, select").forEach((campo) => {
+                campo.disabled = !ativo;
+                campo.required = ativo && campo.hasAttribute("data-obrigatorio");
+            });
+        });
+        document.querySelectorAll("[data-saude-contrato]").forEach((grupo) => {
+            const situacao = grupo.dataset.saudeContrato;
+            const ativo = ehPessoaFisica && ramo === "saude"
+                && (situacao === "ambos" || situacao === possuiContrato.value);
             grupo.hidden = !ativo;
             grupo.querySelectorAll("input, select").forEach((campo) => {
                 campo.disabled = !ativo;
@@ -393,6 +445,25 @@
     function atualizarDetalhesPlano() {
         const opcao = planoSelect.selectedOptions[0];
         planoDetalhes.textContent = opcao ? opcao.dataset.detalhes || "" : "";
+        const segmentacaoPlano = opcao && opcao.dataset.tipo === "saude"
+            ? opcao.dataset.segmentacao
+            : "";
+        Array.from(segmentacaoSelect.options).forEach((item) => {
+            const disponivel = !segmentacaoPlano || !item.value || item.value === segmentacaoPlano;
+            item.disabled = !disponivel;
+            item.hidden = !disponivel;
+        });
+        if (segmentacaoPlano) {
+            segmentacaoSelect.value = segmentacaoPlano;
+        }
+    }
+
+    function aoAlterarPlano() {
+        const opcao = planoSelect.selectedOptions[0];
+        if (opcao && opcao.dataset.tipo === "saude" && !opcao.dataset.segmentacao) {
+            segmentacaoSelect.value = "";
+        }
+        atualizarDetalhesPlano();
     }
 
     function atualizarCondutorAdicional() {
@@ -402,11 +473,29 @@
         idadeAdicional.required = ativo;
     }
 
+    function atualizarDiasVigencia() {
+        if (!dataInicioContrato.value) {
+            diasVigencia.textContent = "Os dias de vigência serão calculados automaticamente.";
+            return;
+        }
+        const [ano, mes, dia] = dataInicioContrato.value.split("-").map(Number);
+        const inicio = Date.UTC(ano, mes - 1, dia);
+        const agora = new Date();
+        const hoje = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate());
+        const dias = Math.floor((hoje - inicio) / 86400000);
+        diasVigencia.textContent = dias < 0
+            ? "A data de início não pode ser futura."
+            : `${dias} dia(s) desde o início da vigência.`;
+    }
+
     tipoSeguro.addEventListener("change", atualizarCamposPorRamo);
     tipoPessoa.addEventListener("change", atualizarCamposPorRamo);
+    possuiContrato.addEventListener("change", atualizarCamposPorRamo);
+    dataInicioContrato.addEventListener("change", atualizarDiasVigencia);
     seguradoraSelect.addEventListener("change", atualizarPlanos);
-    planoSelect.addEventListener("change", atualizarDetalhesPlano);
+    planoSelect.addEventListener("change", aoAlterarPlano);
     condutorAdicional.addEventListener("change", atualizarCondutorAdicional);
     atualizarCamposPorRamo();
+    atualizarDiasVigencia();
 </script>
 {% endblock %}

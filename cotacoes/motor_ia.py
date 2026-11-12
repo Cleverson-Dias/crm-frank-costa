@@ -44,6 +44,7 @@ possa ajusta-los sem mexer nas regras.
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+import math
 from typing import Callable, Optional
 
 VERSAO_BASE_REGRAS = "2026.11.1"
@@ -97,6 +98,16 @@ COBERTURAS_POR_SEGMENTACAO = {
     "ambulatorial": {"ambulatorial"},
     "hospitalar": {"hospitalar"},
     "hospitalar_obstetricia": {"hospitalar", "obstetricia"},
+    "odontologico": {"odontologica"},
+    "ambulatorial_hospitalar_obstetricia": {"ambulatorial", "hospitalar", "obstetricia"},
+    "ambulatorial_odontologico": {"ambulatorial", "odontologica"},
+    "ambulatorial_hospitalar": {"ambulatorial", "hospitalar"},
+    "hospitalar_obstetricia_odontologico": {"hospitalar", "obstetricia", "odontologica"},
+    "hospitalar_odontologico": {"hospitalar", "odontologica"},
+    "ambulatorial_hospitalar_odontologico": {"ambulatorial", "hospitalar", "odontologica"},
+    "ambulatorial_hospitalar_obstetricia_odontologico": {
+        "ambulatorial", "hospitalar", "obstetricia", "odontologica"
+    },
     "referencia": {"ambulatorial", "hospitalar", "obstetricia"},
 }
 
@@ -132,6 +143,7 @@ CAMPOS_OBRIGATORIOS = {
     "auto": ["idade", "valor_bem"],
     "vida": ["idade", "capital_segurado"],
     "saude_atendimento": ["idade", "segmentacao_contratada", "tipo_atendimento", "dias_contrato"],
+    "saude_nova_contratacao": ["idade", "segmentacao_contratada", "cobertura_exigida", "tipo_contratacao", "quantidade_vidas"],
     "saude_reajuste": ["idade", "tipo_plano", "tipo_reajuste"],
 }
 
@@ -335,7 +347,7 @@ REGRAS_SAUDE = [
               for k, limite in PS["carencia_maxima_legal_dias"].items())},
           0),
     Regra("C-202", "saude", "Verifica se o procedimento e coberto pela segmentacao contratada",
-          lambda f: _atendimento(f) and "segmentacao_contratada" in f and "segmentacao_compativel" not in f,
+          lambda f: f.get("operacao", "atendimento") in {"atendimento", "nova_contratacao"} and "segmentacao_contratada" in f and "segmentacao_compativel" not in f,
           lambda f: {"segmentacao_compativel": f.get("cobertura_exigida", "ambulatorial")
                      in COBERTURAS_POR_SEGMENTACAO.get(f["segmentacao_contratada"], set())},
           0),
@@ -358,7 +370,7 @@ REGRAS_SAUDE = [
     # --- Parecer ---
     Regra("S-001", "saude", "Dados do beneficiario ou do contrato incompletos",
           lambda f: _sem_parecer(f) and _faltando(
-              f, CAMPOS_OBRIGATORIOS["saude_reajuste" if _reajuste(f) else "saude_atendimento"]),
+              f, CAMPOS_OBRIGATORIOS["saude_reajuste" if _reajuste(f) else "saude_nova_contratacao" if f.get("operacao") == "nova_contratacao" else "saude_atendimento"]),
           lambda f: _parecer("S-001", "Pendência de Dados",
                              "Dados do beneficiario, dependentes ou do contrato incompletos."),
           1),
@@ -368,6 +380,18 @@ REGRAS_SAUDE = [
           lambda f: _parecer("S-002", "Não Coberto",
                              "Procedimento fora do Rol da ANS ou incompativel com a segmentacao contratada."),
           2),
+    Regra("S-011", "saude", "Nova contratacao requer cotacao e condicoes da operadora",
+          lambda f: _sem_parecer(f) and f.get("operacao") == "nova_contratacao"
+          and f.get("segmentacao_compativel") is True,
+          lambda f: _parecer("S-011", "Aguardando Cotação da Operadora",
+                             "Sem contrato vigente: carências e preço dependem da proposta e das condições informadas pela operadora."),
+          11),
+    Regra("S-012", "saude", "Cobertura solicitada fora da segmentacao pretendida",
+          lambda f: _sem_parecer(f) and f.get("operacao") == "nova_contratacao"
+          and f.get("segmentacao_compativel") is False,
+          lambda f: _parecer("S-012", "Revisar Segmentação",
+                             "A segmentação pretendida não inclui a cobertura solicitada."),
+          12),
     Regra("S-003", "saude", "Atendimento fora da area de abrangencia geografica",
           lambda f: _sem_parecer(f) and _atendimento(f) and not f.get("dentro_abrangencia", True),
           lambda f: _parecer("S-003", "Oferecer Produto / Análise Manual",
@@ -503,27 +527,81 @@ def fator_risco_por_perfil(perfil: dict, parecer: Optional[dict] = None) -> floa
     return FATORES_RISCO.get(parecer["status"], 1.0)
 
 
-# Taxa base sobre o valor do bem (auto) ou sobre o capital segurado (vida).
-# Plano de saude nao e precificado pelo motor: a mensalidade vem da
-# tabela da operadora por faixa etaria.
+# Taxa base de estimativa sobre o valor do bem (auto) ou capital segurado (vida).
+# Em saúde, a entrada é uma mensalidade informada ou o prêmio anual da operadora.
 TAXA_BASE = {"auto": 0.045, "vida": 0.008}
 MARGEM_CORRETORA = 0.15
 
 
-def calcular_proposta(tipo_seguro: str, valor_bem: float, fator_risco: float) -> dict:
+def taxa_referencia_vida(idade: Optional[int]) -> float:
+    """Taxa anual estimativa baseada em faixas públicas de preço de 2026.
+
+    Usa o limite superior publicado para cobertura básica por morte, não é
+    tarifa de seguradora nem substitui cotação com as coberturas e o perfil.
+    Sem idade, preserva a taxa legada para chamadas antigas do motor.
+    """
+    if idade is None:
+        return TAXA_BASE["vida"]
+    pontos = (
+        (18, 35), (25, 35), (30, 35), (35, 50), (40, 50),
+        (45, 120), (50, 120), (55, 250), (60, 250), (65, 500),
+    )  # prêmio mensal por R$ 100 mil de capital segurado
+    idade = max(18, int(idade))
+    mensal_por_100mil = pontos[-1][1]
+    for (idade_a, valor_a), (idade_b, valor_b) in zip(pontos, pontos[1:]):
+        if idade <= idade_b:
+            proporcao = (idade - idade_a) / (idade_b - idade_a)
+            mensal_por_100mil = valor_a + (valor_b - valor_a) * proporcao
+            break
+    return mensal_por_100mil * 12 / 100_000
+
+
+def calcular_proposta(
+    tipo_seguro: str,
+    valor_bem: Optional[float],
+    fator_risco: Optional[float],
+    idade: Optional[int] = None,
+    periodicidade: str = "anual",
+) -> dict:
     ramo = _normalizar_ramo(tipo_seguro)
+    try:
+        valor = float(valor_bem) if valor_bem is not None else None
+    except (TypeError, ValueError, OverflowError):
+        valor = None
+    try:
+        fator = float(fator_risco) if fator_risco is not None else 1.0
+    except (TypeError, ValueError, OverflowError):
+        fator = 1.0
+
+    if valor is None or not math.isfinite(valor) or valor < 0:
+        return {
+            "premio_bruto": None,
+            "premio": None,
+            "franquia": 0.0,
+            "comissao_corretora": None,
+            "margem": None,
+        }
+    if not math.isfinite(fator):
+        fator = 1.0
+
     if ramo == "saude":
-        premio = valor_bem
+        premio = valor * 12 if periodicidade == "mensal" else valor
         franquia = 0.0
-        margem = 0.0
+        margem = premio * 0.10
     else:
         if ramo not in TAXA_BASE:
             raise ValueError(f"Tipo de seguro '{tipo_seguro}' nao possui taxa de calculo configurada.")
-        premio = valor_bem * TAXA_BASE[ramo] * fator_risco
+        taxa = taxa_referencia_vida(idade) if ramo == "vida" else TAXA_BASE[ramo]
+        premio = valor * taxa * fator
         franquia = premio * 0.6
         margem = premio * MARGEM_CORRETORA
+    premio = round(premio, 2)
+    franquia = round(franquia, 2)
+    margem = round(margem, 2)
     return {
-        "premio": round(premio, 2),
-        "franquia": round(franquia, 2),
-        "margem": round(margem, 2),
+        "premio_bruto": premio,
+        "premio": premio,
+        "franquia": franquia,
+        "comissao_corretora": margem,
+        "margem": margem,
     }
